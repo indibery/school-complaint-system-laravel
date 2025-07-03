@@ -68,6 +68,31 @@ class Complaint extends Model
         'is_anonymous' => 'boolean',
         'is_public' => 'boolean',
         'view_count' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+    ];
+
+    /**
+     * The attributes that should be mutated to dates.
+     *
+     * @var array<string>
+     */
+    protected $dates = [
+        'due_date',
+        'resolved_at',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+    ];
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<string>
+     */
+    protected $hidden = [
+        'deleted_at',
     ];
 
     /**
@@ -228,6 +253,52 @@ class Complaint extends Model
     }
 
     /**
+     * 민원 상태 라벨 Accessor
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->status->label();
+    }
+
+    /**
+     * 우선순위 라벨 Accessor
+     */
+    public function getPriorityLabelAttribute(): string
+    {
+        return $this->priority->label();
+    }
+
+    /**
+     * 처리 기간 Accessor (일 단위)
+     */
+    public function getProcessingDaysAttribute(): ?int
+    {
+        if ($this->resolved_at) {
+            return $this->created_at->diffInDays($this->resolved_at);
+        }
+        return null;
+    }
+
+    /**
+     * 남은 기간 Accessor (일 단위)
+     */
+    public function getRemainingDaysAttribute(): ?int
+    {
+        if ($this->due_date && !$this->isResolved()) {
+            return Carbon::now()->diffInDays($this->due_date, false);
+        }
+        return null;
+    }
+
+    /**
+     * 민원 요약 Accessor
+     */
+    public function getSummaryAttribute(): string
+    {
+        return mb_substr($this->content, 0, 100) . (mb_strlen($this->content) > 100 ? '...' : '');
+    }
+
+    /**
      * 민원 번호 생성
      */
     public static function generateComplaintNumber(): string
@@ -380,5 +451,48 @@ class Complaint extends Model
     public function scopeByAssignee($query, $userId)
     {
         return $query->where('assigned_to', $userId);
+    }
+
+    /**
+     * 민원 생성 시 유효성 검증 규칙
+     */
+    public static function getValidationRules($isUpdate = false): array
+    {
+        return [
+            'title' => 'required|string|max:255|min:10',
+            'content' => 'required|string|min:20|max:10000',
+            'category_id' => 'required|exists:categories,id',
+            'department_id' => 'required|exists:departments,id',
+            'priority' => 'required|in:' . implode(',', Priority::getValues()),
+            'due_date' => 'nullable|date|after:today',
+            'satisfaction_score' => 'nullable|integer|min:1|max:5',
+            'is_anonymous' => 'boolean',
+            'is_public' => 'boolean',
+        ];
+    }
+
+    /**
+     * 민원 생성 시 유효성 검증 메시지
+     */
+    public static function getValidationMessages(): array
+    {
+        return [
+            'title.required' => '민원 제목은 필수입니다.',
+            'title.min' => '민원 제목은 최소 10자 이상 입력해주세요.',
+            'title.max' => '민원 제목은 최대 255자까지 입력 가능합니다.',
+            'content.required' => '민원 내용은 필수입니다.',
+            'content.min' => '민원 내용은 최소 20자 이상 입력해주세요.',
+            'content.max' => '민원 내용은 최대 10,000자까지 입력 가능합니다.',
+            'category_id.required' => '카테고리는 필수입니다.',
+            'category_id.exists' => '존재하지 않는 카테고리입니다.',
+            'department_id.required' => '처리 부서는 필수입니다.',
+            'department_id.exists' => '존재하지 않는 부서입니다.',
+            'priority.required' => '우선순위는 필수입니다.',
+            'priority.in' => '올바른 우선순위를 선택해주세요.',
+            'due_date.date' => '올바른 날짜 형식을 입력해주세요.',
+            'due_date.after' => '처리 예정일은 오늘 이후로 설정해주세요.',
+            'satisfaction_score.min' => '만족도는 1점 이상이어야 합니다.',
+            'satisfaction_score.max' => '만족도는 5점 이하여야 합니다.',
+        ];
     }
 }

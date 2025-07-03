@@ -225,4 +225,32 @@ class Comment extends Model
     {
         return $query->orderBy('created_at', 'asc');
     }
+
+    /**
+     * 댓글 생성 시 유효성 검증 규칙
+     */
+    public static function getValidationRules($isUpdate = false): array
+    {
+        return [
+            'content' => 'required|string|min:5|max:2000',
+            'complaint_id' => 'required|exists:complaints,id',
+            'parent_id' => 'nullable|exists:comments,id',
+            'is_internal' => 'boolean',
+        ];
+    }
+
+    /**
+     * 댓글 생성 시 유효성 검증 메시지
+     */
+    public static function getValidationMessages(): array
+    {
+        return [
+            'content.required' => '댓글 내용은 필수입니다.',
+            'content.min' => '댓글 내용은 최소 5자 이상 입력해주세요.',
+            'content.max' => '댓글 내용은 최대 2,000자까지 입력 가능합니다.',
+            'complaint_id.required' => '민원 ID는 필수입니다.',
+            'complaint_id.exists' => '존재하지 않는 민원입니다.',
+            'parent_id.exists' => '존재하지 않는 상위 댓글입니다.',
+        ];
+    }
 }

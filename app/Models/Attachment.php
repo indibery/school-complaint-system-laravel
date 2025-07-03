@@ -213,4 +213,52 @@ class Attachment extends Model
     {
         return $query->whereBetween('file_size', [$minSize, $maxSize]);
     }
+
+    /**
+     * 첨부파일 업로드 시 유효성 검증 규칙
+     */
+    public static function getValidationRules($isUpdate = false): array
+    {
+        return [
+            'file' => 'required|file|max:10240|mimes:jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar',
+            'complaint_id' => 'required|exists:complaints,id',
+            'comment_id' => 'nullable|exists:comments,id',
+        ];
+    }
+
+    /**
+     * 첨부파일 업로드 시 유효성 검증 메시지
+     */
+    public static function getValidationMessages(): array
+    {
+        return [
+            'file.required' => '파일을 선택해주세요.',
+            'file.file' => '올바른 파일을 선택해주세요.',
+            'file.max' => '파일 크기는 10MB 이하여야 합니다.',
+            'file.mimes' => '허용되지 않는 파일 형식입니다. (jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx, ppt, pptx, txt, zip, rar만 가능)',
+            'complaint_id.required' => '민원 ID는 필수입니다.',
+            'complaint_id.exists' => '존재하지 않는 민원입니다.',
+            'comment_id.exists' => '존재하지 않는 댓글입니다.',
+        ];
+    }
+
+    /**
+     * 허용되는 파일 확장자 목록
+     */
+    public static function getAllowedExtensions(): array
+    {
+        return [
+            'images' => ['jpg', 'jpeg', 'png', 'gif'],
+            'documents' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'],
+            'archives' => ['zip', 'rar'],
+        ];
+    }
+
+    /**
+     * 파일 크기 제한 (바이트)
+     */
+    public static function getMaxFileSize(): int
+    {
+        return 10 * 1024 * 1024; // 10MB
+    }
 }

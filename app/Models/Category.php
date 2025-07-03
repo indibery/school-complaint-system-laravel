@@ -112,4 +112,36 @@ class Category extends Model
     {
         return $query->orderBy('sort_order');
     }
+
+    /**
+     * 카테고리 생성 시 유효성 검증 규칙
+     */
+    public static function getValidationRules($isUpdate = false): array
+    {
+        return [
+            'name' => 'required|string|max:100|regex:/^[가-힣a-zA-Z0-9\s\-()]+$/',
+            'code' => 'required|string|max:20|unique:categories,code|regex:/^[A-Z0-9_]+$/',
+            'description' => 'nullable|string|max:500',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'sort_order' => 'nullable|integer|min:0|max:9999',
+        ];
+    }
+
+    /**
+     * 카테고리 생성 시 유효성 검증 메시지
+     */
+    public static function getValidationMessages(): array
+    {
+        return [
+            'name.required' => '카테고리명은 필수입니다.',
+            'name.regex' => '카테고리명은 한글, 영문, 숫자, 공백, 하이픈, 괄호만 입력 가능합니다.',
+            'code.required' => '카테고리 코드는 필수입니다.',
+            'code.unique' => '이미 사용 중인 카테고리 코드입니다.',
+            'code.regex' => '카테고리 코드는 영문 대문자, 숫자, 언더스코어만 입력 가능합니다.',
+            'description.max' => '설명은 최대 500자까지 입력 가능합니다.',
+            'color.regex' => '올바른 색상 코드를 입력해주세요. (예: #FF0000)',
+            'sort_order.min' => '정렬 순서는 0 이상이어야 합니다.',
+            'sort_order.max' => '정렬 순서는 9999 이하여야 합니다.',
+        ];
+    }
 }

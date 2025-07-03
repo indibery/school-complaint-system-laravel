@@ -216,5 +216,51 @@ class User extends Authenticatable
     {
         return $query->where('department_id', $departmentId);
     }
+
+    /**
+     * 사용자 생성 시 유효성 검증 규칙
+     */
+    public static function getValidationRules($isUpdate = false): array
+    {
+        $rules = [
+            'name' => 'required|string|max:255|regex:/^[가-힣a-zA-Z\s]+$/',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'role' => 'required|in:' . implode(',', UserRole::getValues()),
+            'department_id' => 'nullable|exists:departments,id',
+            'phone' => 'nullable|string|regex:/^01[016789]-?[0-9]{3,4}-?[0-9]{4}$/',
+            'student_id' => 'nullable|string|max:20|unique:users,student_id',
+            'employee_id' => 'nullable|string|max:20|unique:users,employee_id',
+        ];
+
+        if ($isUpdate) {
+            $rules['password'] = 'nullable|string|min:8|confirmed';
+        }
+
+        return $rules;
+    }
+
+    /**
+     * 사용자 생성 시 유효성 검증 메시지
+     */
+    public static function getValidationMessages(): array
+    {
+        return [
+            'name.required' => '이름은 필수입니다.',
+            'name.regex' => '이름은 한글, 영문, 공백만 입력 가능합니다.',
+            'email.required' => '이메일은 필수입니다.',
+            'email.email' => '올바른 이메일 형식을 입력해주세요.',
+            'email.unique' => '이미 사용 중인 이메일입니다.',
+            'password.required' => '비밀번호는 필수입니다.',
+            'password.min' => '비밀번호는 최소 8자 이상이어야 합니다.',
+            'password.confirmed' => '비밀번호 확인이 일치하지 않습니다.',
+            'role.required' => '사용자 역할은 필수입니다.',
+            'role.in' => '올바른 사용자 역할을 선택해주세요.',
+            'department_id.exists' => '존재하지 않는 부서입니다.',
+            'phone.regex' => '올바른 휴대폰 번호 형식을 입력해주세요. (예: 010-1234-5678)',
+            'student_id.unique' => '이미 사용 중인 학번입니다.',
+            'employee_id.unique' => '이미 사용 중인 사번입니다.',
+        ];
+    }
 }
 }
