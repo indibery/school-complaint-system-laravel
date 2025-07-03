@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,44 +13,30 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
-
-    /**
-     * 기본적으로 로드할 관계들
-     *
-     * @var array<string>
-     */
-    protected $with = ['department'];
-
-    /**
-     * 관계 로딩 시 카운트할 관계들
-     *
-     * @var array<string>
-     */
-    protected $withCount = ['complaints', 'assignedComplaints'];
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
-        'student_id',
-        'employee_id',
-        'department_id',
-        'phone',
+        'grade',           // 교사가 담당하는 학년
+        'class_number',    // 교사가 담당하는 반
+        'subject',         // 교사 담당 과목
+        'department',      // 부서 (운영팀, 보안팀 등)
+        'phone',           // 연락처
         'is_active',
     ];
 
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -58,115 +44,71 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+    ];
+
+    /**
+     * 역할별 상수
+     */
+    const ROLE_ADMIN = 'admin';
+    const ROLE_TEACHER = 'teacher';
+    const ROLE_PARENT = 'parent';
+    const ROLE_SECURITY_STAFF = 'security_staff';  // 학교지킴이
+    const ROLE_OPS_STAFF = 'ops_staff';            // 운영팀 사원
+
+    /**
+     * 접근 채널별 상수
+     */
+    const CHANNEL_PARENT_APP = 'parent_app';
+    const CHANNEL_TEACHER_WEB = 'teacher_web';
+    const CHANNEL_SECURITY_APP = 'security_app';
+    const CHANNEL_OPS_WEB = 'ops_web';
+    const CHANNEL_ADMIN_WEB = 'admin_web';
+
+    /**
+     * 담당 학생들 (교사인 경우)
+     */
+    public function homeroomStudents(): HasMany
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'role' => UserRole::class,
-            'is_active' => 'boolean',
-        ];
+        return $this->hasMany(Student::class, null, null)
+                    ->where('grade', $this->grade)
+                    ->where('class_number', $this->class_number);
     }
 
     /**
-     * 사용자가 속한 부서
+     * 학부모-학생 관계 (학부모인 경우)
      */
-    public function department(): BelongsTo
+    public function children(): BelongsToMany
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsToMany(Student::class, 'parent_student_relationships', 'parent_id', 'student_id')
+            ->withPivot(['relationship_type', 'is_primary'])
+            ->withTimestamps();
     }
 
     /**
-     * 사용자가 작성한 민원들
+     * 제기한 민원들 (학부모인 경우)
      */
     public function complaints(): HasMany
     {
-        return $this->hasMany(Complaint::class);
+        return $this->hasMany(Complaint::class, 'complainant_id');
     }
 
     /**
-     * 사용자가 담당하는 민원들
+     * 처리 담당 민원들 (교사/관리자/직원인 경우)
      */
     public function assignedComplaints(): HasMany
     {
         return $this->hasMany(Complaint::class, 'assigned_to');
-    }
-
-    /**
-     * 사용자가 작성한 댓글들
-     */
-    public function comments(): HasMany
-    {
-        return $this->hasMany(Comment::class);
-    }
-
-    /**
-     * 사용자가 업로드한 첨부파일들
-     */
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(Attachment::class, 'uploaded_by');
-    }
-
-    /**
-     * 사용자가 작성한 상태 로그들
-     */
-    public function statusLogs(): HasMany
-    {
-        return $this->hasMany(ComplaintStatusLog::class);
-    }
-
-    /**
-     * 관리하는 부서 (부서장인 경우)
-     */
-    public function managedDepartment(): HasMany
-    {
-        return $this->hasMany(Department::class, 'manager_id');
-    }
-
-    /**
-     * 사용자가 관련된 모든 민원 (작성자 + 담당자)
-     */
-    public function relatedComplaints(): HasMany
-    {
-        return $this->hasMany(Complaint::class, 'user_id')
-            ->union($this->hasMany(Complaint::class, 'assigned_to'));
-    }
-
-    /**
-     * 사용자가 처리한 상태 변경 로그들
-     */
-    public function processedStatusLogs(): HasMany
-    {
-        return $this->hasMany(ComplaintStatusLog::class, 'user_id');
-    }
-
-    /**
-     * 관리자 권한 여부
-     */
-    public function isAdmin(): bool
-    {
-        return $this->role === UserRole::ADMIN;
-    }
-
-    /**
-     * 교직원 권한 여부 (관리자 포함)
-     */
-    public function isStaff(): bool
-    {
-        return $this->role->isStaff();
-    }
-
-    /**
-     * 학생 권한 여부
-     */
-    public function isStudent(): bool
-    {
-        return $this->role === UserRole::STUDENT;
     }
 
     /**
@@ -178,19 +120,112 @@ class User extends Authenticatable
     }
 
     /**
-     * 전체 이름 반환 (역할 포함)
+     * 관리자 여부
      */
-    public function getFullNameAttribute(): string
+    public function isAdmin(): bool
     {
-        return $this->name . ' (' . $this->role->label() . ')';
+        return $this->role === self::ROLE_ADMIN;
     }
 
     /**
-     * 학번 또는 사번 반환
+     * 교사 여부
      */
-    public function getIdentifierAttribute(): string
+    public function isTeacher(): bool
     {
-        return $this->student_id ?? $this->employee_id ?? '';
+        return $this->role === self::ROLE_TEACHER;
+    }
+
+    /**
+     * 학부모 여부
+     */
+    public function isParent(): bool
+    {
+        return $this->role === self::ROLE_PARENT;
+    }
+
+    /**
+     * 학교지킴이 여부
+     */
+    public function isSecurityStaff(): bool
+    {
+        return $this->role === self::ROLE_SECURITY_STAFF;
+    }
+
+    /**
+     * 운영팀 사원 여부
+     */
+    public function isOpsStaff(): bool
+    {
+        return $this->role === self::ROLE_OPS_STAFF;
+    }
+
+    /**
+     * 직원 여부 (교사 제외한 학교 직원)
+     */
+    public function isStaff(): bool
+    {
+        return in_array($this->role, [self::ROLE_SECURITY_STAFF, self::ROLE_OPS_STAFF]);
+    }
+
+    /**
+     * 민원 처리 권한이 있는 사용자 여부
+     */
+    public function canHandleComplaints(): bool
+    {
+        return in_array($this->role, [
+            self::ROLE_ADMIN, 
+            self::ROLE_TEACHER, 
+            self::ROLE_SECURITY_STAFF, 
+            self::ROLE_OPS_STAFF
+        ]);
+    }
+
+    /**
+     * 접근 가능한 채널 반환
+     */
+    public function getAccessChannelAttribute(): string
+    {
+        return match($this->role) {
+            self::ROLE_PARENT => self::CHANNEL_PARENT_APP,
+            self::ROLE_TEACHER => self::CHANNEL_TEACHER_WEB,
+            self::ROLE_SECURITY_STAFF => self::CHANNEL_SECURITY_APP,
+            self::ROLE_OPS_STAFF => self::CHANNEL_OPS_WEB,
+            self::ROLE_ADMIN => self::CHANNEL_ADMIN_WEB,
+            default => '',
+        };
+    }
+
+    /**
+     * 담임교사 정보 (학년반 포함)
+     */
+    public function getHomeroomInfoAttribute(): ?string
+    {
+        if ($this->isTeacher() && $this->grade && $this->class_number) {
+            return "{$this->grade}학년 {$this->class_number}반 담임";
+        }
+        return null;
+    }
+
+    /**
+     * 사용자 표시명 (역할 포함)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        $roleNames = [
+            self::ROLE_ADMIN => '관리자',
+            self::ROLE_TEACHER => '교사',
+            self::ROLE_PARENT => '학부모',
+            self::ROLE_SECURITY_STAFF => '학교지킴이',
+            self::ROLE_OPS_STAFF => '운영팀',
+        ];
+
+        $roleName = $roleNames[$this->role] ?? '';
+        
+        if ($this->isTeacher() && $this->homeroomInfo) {
+            return "{$this->name} ({$this->homeroomInfo})";
+        }
+
+        return "{$this->name} ({$roleName})";
     }
 
     /**
@@ -202,19 +237,88 @@ class User extends Authenticatable
     }
 
     /**
-     * 역할별 사용자 스코프
+     * 역할별 스코프
      */
-    public function scopeByRole($query, UserRole $role)
+    public function scopeByRole($query, $role)
     {
         return $query->where('role', $role);
     }
 
     /**
-     * 부서별 사용자 스코프
+     * 교사 스코프
      */
-    public function scopeByDepartment($query, $departmentId)
+    public function scopeTeachers($query)
     {
-        return $query->where('department_id', $departmentId);
+        return $query->where('role', self::ROLE_TEACHER);
+    }
+
+    /**
+     * 학부모 스코프
+     */
+    public function scopeParents($query)
+    {
+        return $query->where('role', self::ROLE_PARENT);
+    }
+
+    /**
+     * 직원 스코프 (보안팀, 운영팀)
+     */
+    public function scopeStaff($query)
+    {
+        return $query->whereIn('role', [self::ROLE_SECURITY_STAFF, self::ROLE_OPS_STAFF]);
+    }
+
+    /**
+     * 민원 처리 가능한 사용자 스코프
+     */
+    public function scopeComplaintHandlers($query)
+    {
+        return $query->whereIn('role', [
+            self::ROLE_ADMIN, 
+            self::ROLE_TEACHER, 
+            self::ROLE_SECURITY_STAFF, 
+            self::ROLE_OPS_STAFF
+        ]);
+    }
+
+    /**
+     * 담임교사 스코프 (학년반 정보가 있는 교사)
+     */
+    public function scopeHomeroomTeachers($query)
+    {
+        return $query->where('role', self::ROLE_TEACHER)
+                    ->whereNotNull('grade')
+                    ->whereNotNull('class_number');
+    }
+
+    /**
+     * 특정 학년반 담임교사 스코프
+     */
+    public function scopeByHomeroom($query, $grade, $classNumber)
+    {
+        return $query->where('role', self::ROLE_TEACHER)
+                    ->where('grade', $grade)
+                    ->where('class_number', $classNumber);
+    }
+
+    /**
+     * 부서별 스코프
+     */
+    public function scopeByDepartment($query, $department)
+    {
+        return $query->where('department', $department);
+    }
+
+    /**
+     * 사용자 검색 스코프
+     */
+    public function scopeSearch($query, $keyword)
+    {
+        return $query->where(function($q) use ($keyword) {
+            $q->where('name', 'like', "%{$keyword}%")
+              ->orWhere('email', 'like', "%{$keyword}%")
+              ->orWhere('department', 'like', "%{$keyword}%");
+        });
     }
 
     /**
@@ -222,22 +326,17 @@ class User extends Authenticatable
      */
     public static function getValidationRules($isUpdate = false): array
     {
-        $rules = [
+        return [
             'name' => 'required|string|max:255|regex:/^[가-힣a-zA-Z\s]+$/',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:' . implode(',', UserRole::getValues()),
-            'department_id' => 'nullable|exists:departments,id',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => $isUpdate ? 'nullable|string|min:8' : 'required|string|min:8',
+            'role' => 'required|in:admin,teacher,parent,security_staff,ops_staff',
+            'grade' => 'nullable|integer|min:1|max:6',
+            'class_number' => 'nullable|integer|min:1|max:20',
+            'subject' => 'nullable|string|max:100',
+            'department' => 'nullable|string|max:100',
             'phone' => 'nullable|string|regex:/^01[016789]-?[0-9]{3,4}-?[0-9]{4}$/',
-            'student_id' => 'nullable|string|max:20|unique:users,student_id',
-            'employee_id' => 'nullable|string|max:20|unique:users,employee_id',
         ];
-
-        if ($isUpdate) {
-            $rules['password'] = 'nullable|string|min:8|confirmed';
-        }
-
-        return $rules;
     }
 
     /**
@@ -253,14 +352,13 @@ class User extends Authenticatable
             'email.unique' => '이미 사용 중인 이메일입니다.',
             'password.required' => '비밀번호는 필수입니다.',
             'password.min' => '비밀번호는 최소 8자 이상이어야 합니다.',
-            'password.confirmed' => '비밀번호 확인이 일치하지 않습니다.',
-            'role.required' => '사용자 역할은 필수입니다.',
-            'role.in' => '올바른 사용자 역할을 선택해주세요.',
-            'department_id.exists' => '존재하지 않는 부서입니다.',
-            'phone.regex' => '올바른 휴대폰 번호 형식을 입력해주세요. (예: 010-1234-5678)',
-            'student_id.unique' => '이미 사용 중인 학번입니다.',
-            'employee_id.unique' => '이미 사용 중인 사번입니다.',
+            'role.required' => '역할은 필수입니다.',
+            'role.in' => '올바른 역할을 선택해주세요.',
+            'grade.min' => '학년은 1 이상이어야 합니다.',
+            'grade.max' => '학년은 6 이하여야 합니다.',
+            'class_number.min' => '반은 1 이상이어야 합니다.',
+            'class_number.max' => '반은 20 이하여야 합니다.',
+            'phone.regex' => '올바른 휴대폰 번호 형식을 입력해주세요.',
         ];
     }
-}
 }

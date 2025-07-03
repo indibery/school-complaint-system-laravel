@@ -24,13 +24,7 @@ class Student extends Model
         'grade',
         'class_number',
         'student_number',
-        'homeroom_teacher_id',
-        'birth_date',
         'gender',
-        'phone',
-        'address',
-        'emergency_contact_name',
-        'emergency_contact_phone',
         'is_active',
     ];
 
@@ -40,7 +34,6 @@ class Student extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'birth_date' => 'date',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -53,18 +46,20 @@ class Student extends Model
      * @var array<string>
      */
     protected $dates = [
-        'birth_date',
         'created_at',
         'updated_at',
         'deleted_at',
     ];
 
     /**
-     * 담임교사
+     * 담임교사 (학년/반 정보로 찾기)
      */
-    public function homeroomTeacher(): BelongsTo
+    public function homeroomTeacher()
     {
-        return $this->belongsTo(User::class, 'homeroom_teacher_id');
+        return User::where('grade', $this->grade)
+                   ->where('class_number', $this->class_number)
+                   ->where('role', 'teacher')
+                   ->first();
     }
 
     /**
@@ -118,14 +113,6 @@ class Student extends Model
     }
 
     /**
-     * 나이 계산
-     */
-    public function getAgeAttribute(): int
-    {
-        return $this->birth_date ? $this->birth_date->age : 0;
-    }
-
-    /**
      * 활성 학생 스코프
      */
     public function scopeActive($query)
@@ -150,11 +137,11 @@ class Student extends Model
     }
 
     /**
-     * 담임교사별 스코프
+     * 담임교사별 스코프 (학년/반으로 찾기)
      */
-    public function scopeByHomeroom($query, $teacherId)
+    public function scopeByHomeroom($query, $grade, $classNumber)
     {
-        return $query->where('homeroom_teacher_id', $teacherId);
+        return $query->where('grade', $grade)->where('class_number', $classNumber);
     }
 
     /**
@@ -179,13 +166,7 @@ class Student extends Model
             'grade' => 'required|integer|min:1|max:6',
             'class_number' => 'required|integer|min:1|max:20',
             'student_number' => 'required|integer|min:1|max:50',
-            'homeroom_teacher_id' => 'nullable|exists:users,id',
-            'birth_date' => 'required|date|before:today',
             'gender' => 'required|in:male,female',
-            'phone' => 'nullable|string|regex:/^01[016789]-?[0-9]{3,4}-?[0-9]{4}$/',
-            'address' => 'nullable|string|max:500',
-            'emergency_contact_name' => 'required|string|max:255',
-            'emergency_contact_phone' => 'required|string|regex:/^01[016789]-?[0-9]{3,4}-?[0-9]{4}$/',
         ];
     }
 
@@ -204,14 +185,7 @@ class Student extends Model
             'grade.max' => '학년은 6 이하여야 합니다.',
             'class_number.required' => '반은 필수입니다.',
             'student_number.required' => '번호는 필수입니다.',
-            'homeroom_teacher_id.exists' => '존재하지 않는 교사입니다.',
-            'birth_date.required' => '생년월일은 필수입니다.',
-            'birth_date.before' => '생년월일은 오늘 이전이어야 합니다.',
             'gender.required' => '성별은 필수입니다.',
-            'phone.regex' => '올바른 휴대폰 번호 형식을 입력해주세요.',
-            'emergency_contact_name.required' => '비상연락처 이름은 필수입니다.',
-            'emergency_contact_phone.required' => '비상연락처 전화번호는 필수입니다.',
-            'emergency_contact_phone.regex' => '올바른 전화번호 형식을 입력해주세요.',
         ];
     }
 }
