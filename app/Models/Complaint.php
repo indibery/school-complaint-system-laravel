@@ -4,16 +4,32 @@ namespace App\Models;
 
 use App\Enums\ComplaintStatus;
 use App\Enums\Priority;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 class Complaint extends Model
 {
     use HasFactory, SoftDeletes;
+
+    /**
+     * 기본적으로 로드할 관계들
+     *
+     * @var array<string>
+     */
+    protected $with = ['user', 'category', 'department'];
+
+    /**
+     * 관계 로딩 시 카운트할 관계들
+     *
+     * @var array<string>
+     */
+    protected $withCount = ['comments', 'attachments'];
 
     /**
      * The attributes that are mass assignable.
@@ -137,6 +153,78 @@ class Complaint extends Model
     public function statusLogs(): HasMany
     {
         return $this->hasMany(ComplaintStatusLog::class);
+    }
+
+    /**
+     * 민원의 공개 댓글들
+     */
+    public function publicComments(): HasMany
+    {
+        return $this->hasMany(Comment::class)->where('is_internal', false);
+    }
+
+    /**
+     * 민원의 내부 댓글들 (교직원 전용)
+     */
+    public function internalComments(): HasMany
+    {
+        return $this->hasMany(Comment::class)->where('is_internal', true);
+    }
+
+    /**
+     * 민원의 최상위 댓글들 (답글 제외)
+     */
+    public function topLevelComments(): HasMany
+    {
+        return $this->hasMany(Comment::class)->whereNull('parent_id');
+    }
+
+    /**
+     * 민원의 이미지 첨부파일들
+     */
+    public function imageAttachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class)->where('is_image', true);
+    }
+
+    /**
+     * 민원의 일반 첨부파일들
+     */
+    public function fileAttachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class)->where('is_image', false);
+    }
+
+    /**
+     * 민원의 최신 상태 로그
+     */
+    public function latestStatusLog(): HasOne
+    {
+        return $this->hasOne(ComplaintStatusLog::class)->latestOfMany();
+    }
+
+    /**
+     * 민원에 관련된 모든 사용자들 (작성자, 담당자, 댓글 작성자들)
+     */
+    public function relatedUsers(): Collection
+    {
+        $users = collect();
+        
+        // 민원 작성자
+        if ($this->user) {
+            $users->push($this->user);
+        }
+        
+        // 담당자
+        if ($this->assignedUser) {
+            $users->push($this->assignedUser);
+        }
+        
+        // 댓글 작성자들
+        $commentUsers = $this->comments()->with('user')->get()->pluck('user');
+        $users = $users->merge($commentUsers);
+        
+        return $users->unique('id');
     }
 
     /**

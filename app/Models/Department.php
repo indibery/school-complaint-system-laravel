@@ -81,6 +81,41 @@ class Department extends Model
     }
 
     /**
+     * 부서의 모든 하위 부서들 (재귀적)
+     */
+    public function allChildren(): HasMany
+    {
+        return $this->hasMany(Department::class, 'parent_id')->with('allChildren');
+    }
+
+    /**
+     * 부서의 모든 상위 부서들 (재귀적)
+     */
+    public function allParents(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'parent_id')->with('allParents');
+    }
+
+    /**
+     * 부서의 활성 사용자들
+     */
+    public function activeUsers(): HasMany
+    {
+        return $this->hasMany(User::class)->where('is_active', true);
+    }
+
+    /**
+     * 부서의 진행 중인 민원들
+     */
+    public function activeComplaints(): HasMany
+    {
+        return $this->complaints()->whereNotIn('status', [
+            \App\Enums\ComplaintStatus::RESOLVED,
+            \App\Enums\ComplaintStatus::CLOSED
+        ]);
+    }
+
+    /**
      * 활성 부서 여부
      */
     public function isActive(): bool

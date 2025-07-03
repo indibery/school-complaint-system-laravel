@@ -13,6 +13,20 @@ class Comment extends Model
     use HasFactory, SoftDeletes;
 
     /**
+     * 기본적으로 로드할 관계들
+     *
+     * @var array<string>
+     */
+    protected $with = ['user'];
+
+    /**
+     * 관계 로딩 시 카운트할 관계들
+     *
+     * @var array<string>
+     */
+    protected $withCount = ['replies', 'attachments'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -72,6 +86,30 @@ class Comment extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(Attachment::class);
+    }
+
+    /**
+     * 댓글의 모든 하위 댓글들 (재귀적)
+     */
+    public function allReplies(): HasMany
+    {
+        return $this->hasMany(Comment::class, 'parent_id')->with('allReplies');
+    }
+
+    /**
+     * 댓글의 이미지 첨부파일들
+     */
+    public function imageAttachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class)->where('is_image', true);
+    }
+
+    /**
+     * 댓글의 일반 첨부파일들
+     */
+    public function fileAttachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class)->where('is_image', false);
     }
 
     /**

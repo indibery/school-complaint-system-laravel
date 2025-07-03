@@ -44,6 +44,36 @@ class Category extends Model
     }
 
     /**
+     * 카테고리의 활성 민원들
+     */
+    public function activeComplaints(): HasMany
+    {
+        return $this->complaints()->whereNotIn('status', [
+            \App\Enums\ComplaintStatus::RESOLVED,
+            \App\Enums\ComplaintStatus::CLOSED
+        ]);
+    }
+
+    /**
+     * 카테고리의 해결된 민원들
+     */
+    public function resolvedComplaints(): HasMany
+    {
+        return $this->complaints()->whereIn('status', [
+            \App\Enums\ComplaintStatus::RESOLVED,
+            \App\Enums\ComplaintStatus::CLOSED
+        ]);
+    }
+
+    /**
+     * 카테고리의 긴급 민원들
+     */
+    public function urgentComplaints(): HasMany
+    {
+        return $this->complaints()->where('priority', \App\Enums\Priority::URGENT);
+    }
+
+    /**
      * 활성 카테고리 여부
      */
     public function isActive(): bool

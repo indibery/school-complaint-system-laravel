@@ -17,6 +17,20 @@ class User extends Authenticatable
     use HasFactory, Notifiable, SoftDeletes;
 
     /**
+     * 기본적으로 로드할 관계들
+     *
+     * @var array<string>
+     */
+    protected $with = ['department'];
+
+    /**
+     * 관계 로딩 시 카운트할 관계들
+     *
+     * @var array<string>
+     */
+    protected $withCount = ['complaints', 'assignedComplaints'];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -112,6 +126,23 @@ class User extends Authenticatable
     public function managedDepartment(): HasMany
     {
         return $this->hasMany(Department::class, 'manager_id');
+    }
+
+    /**
+     * 사용자가 관련된 모든 민원 (작성자 + 담당자)
+     */
+    public function relatedComplaints(): HasMany
+    {
+        return $this->hasMany(Complaint::class, 'user_id')
+            ->union($this->hasMany(Complaint::class, 'assigned_to'));
+    }
+
+    /**
+     * 사용자가 처리한 상태 변경 로그들
+     */
+    public function processedStatusLogs(): HasMany
+    {
+        return $this->hasMany(ComplaintStatusLog::class, 'user_id');
     }
 
     /**
