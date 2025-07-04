@@ -11,32 +11,27 @@ class Attachment extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'complaint_id',
         'comment_id',
         'original_name',
-        'stored_name',
-        'file_path',
-        'file_size',
+        'file_name',
+        'path',
+        'disk',
         'mime_type',
-        'extension',
+        'size',
+        'thumbnail_path',
         'uploaded_by',
-        'is_image',
+        'download_count',
+        'metadata',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'file_size' => 'integer',
-        'is_image' => 'boolean',
+        'size' => 'integer',
+        'download_count' => 'integer',
+        'metadata' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     /**
@@ -56,7 +51,7 @@ class Attachment extends Model
     }
 
     /**
-     * 첨부파일 업로드자
+     * 업로드한 사용자
      */
     public function uploadedBy(): BelongsTo
     {
@@ -64,201 +59,198 @@ class Attachment extends Model
     }
 
     /**
+     * 파일 URL 생성
+     */
+    public function getUrl(): string
+    {
+        return Storage::disk($this->disk)->url($this->path);
+    }
+
+    /**
+     * 임시 다운로드 URL 생성
+     */
+    public function getTemporaryUrl(int $minutes = 10): string
+    {
+        return Storage::disk($this->disk)->temporaryUrl($this->path, now()->addMinutes($minutes));
+    }
+
+    /**
+     * 썸네일 URL 생성
+     */
+    public function getThumbnailUrl(): ?string
+    {
+        if (!$this->thumbnail_path) {
+            return null;
+        }
+
+        return Storage::disk($this->disk)->url($this->thumbnail_path);
+    }
+
+    /**
+     * 파일 존재 여부 확인
+     */
+    public function exists(): bool
+    {
+        return Storage::disk($this->disk)->exists($this->path);
+    }
+
+    /**
+     * 파일 크기 포맷팅
+     */
+    public function getFormattedSize(): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $bytes = max($this->size, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        
+        $bytes /= pow(1024, $pow);
+        
+        return round($bytes, 2) . ' ' . $units[$pow];
+    }
+
+    /**
+     * 파일 유형 확인
+     */
+    public function getFileType(): string
+    {
+        $mimeType = $this->mime_type;
+        
+        if (str_starts_with($mimeType, 'image/')) {
+            return 'image';
+        } elseif (str_starts_with($mimeType, 'video/')) {
+            return 'video';
+        } elseif (str_starts_with($mimeType, 'audio/')) {
+            return 'audio';
+        } elseif (in_array($mimeType, [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ])) {
+            return 'document';
+        } elseif (in_array($mimeType, [
+            'application/zip',
+            'application/x-rar-compressed',
+            'application/x-7z-compressed',
+        ])) {
+            return 'archive';
+        } elseif (str_starts_with($mimeType, 'text/')) {
+            return 'text';
+        } else {
+            return 'other';
+        }
+    }
+
+    /**
      * 이미지 파일 여부
      */
     public function isImage(): bool
     {
-        return $this->is_image;
+        return str_starts_with($this->mime_type, 'image/');
     }
 
     /**
-     * 파일 크기를 읽기 쉬운 형식으로 반환
+     * 문서 파일 여부
      */
-    public function getHumanReadableSizeAttribute(): string
+    public function isDocument(): bool
     {
-        $bytes = $this->file_size;
-        $units = ['B', 'KB', 'MB', 'GB'];
-        
-        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
-            $bytes /= 1024;
+        return in_array($this->mime_type, [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ]);
+    }
+
+    /**
+     * 압축 파일 여부
+     */
+    public function isArchive(): bool
+    {
+        return in_array($this->mime_type, [
+            'application/zip',
+            'application/x-rar-compressed',
+            'application/x-7z-compressed',
+        ]);
+    }
+
+    /**
+     * 다운로드 수 증가
+     */
+    public function incrementDownloadCount(): void
+    {
+        $this->increment('download_count');
+    }
+
+    /**
+     * 스코프: 이미지 파일만
+     */
+    public function scopeImages($query)
+    {
+        return $query->where('mime_type', 'like', 'image/%');
+    }
+
+    /**
+     * 스코프: 문서 파일만
+     */
+    public function scopeDocuments($query)
+    {
+        return $query->whereIn('mime_type', [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ]);
+    }
+
+    /**
+     * 스코프: 크기별 필터
+     */
+    public function scopeBySize($query, int $minSize = null, int $maxSize = null)
+    {
+        if ($minSize !== null) {
+            $query->where('size', '>=', $minSize);
         }
         
-        return round($bytes, 2) . ' ' . $units[$i];
-    }
-
-    /**
-     * 파일 전체 경로 반환
-     */
-    public function getFullPathAttribute(): string
-    {
-        return Storage::path($this->file_path);
-    }
-
-    /**
-     * 파일 다운로드 URL 반환
-     */
-    public function getDownloadUrlAttribute(): string
-    {
-        return route('attachments.download', $this->id);
-    }
-
-    /**
-     * 파일 미리보기 URL 반환 (이미지인 경우)
-     */
-    public function getPreviewUrlAttribute(): ?string
-    {
-        if ($this->is_image) {
-            return Storage::url($this->file_path);
+        if ($maxSize !== null) {
+            $query->where('size', '<=', $maxSize);
         }
-        return null;
-    }
-
-    /**
-     * 파일 삭제 가능 여부
-     */
-    public function canDelete(User $user): bool
-    {
-        // 업로드한 사용자 본인이거나 관리자인 경우
-        return $this->uploaded_by === $user->id || $user->isAdmin();
-    }
-
-    /**
-     * 파일 다운로드 가능 여부
-     */
-    public function canDownload(User $user): bool
-    {
-        // 민원 작성자, 담당자, 관리자인 경우
-        $complaint = $this->complaint;
         
-        return $user->isAdmin() || 
-               $complaint->user_id === $user->id || 
-               $complaint->assigned_to === $user->id;
+        return $query;
     }
 
     /**
-     * 파일 실제 삭제
+     * 파일 삭제 (스토리지에서도 삭제)
      */
     public function deleteFile(): bool
     {
         try {
-            if (Storage::exists($this->file_path)) {
-                Storage::delete($this->file_path);
+            // 원본 파일 삭제
+            if ($this->exists()) {
+                Storage::disk($this->disk)->delete($this->path);
             }
+            
+            // 썸네일 삭제
+            if ($this->thumbnail_path && Storage::disk($this->disk)->exists($this->thumbnail_path)) {
+                Storage::disk($this->disk)->delete($this->thumbnail_path);
+            }
+            
+            // 데이터베이스에서 삭제
             return $this->delete();
+            
         } catch (\Exception $e) {
+            \Log::error('File deletion failed: ' . $e->getMessage());
             return false;
         }
-    }
-
-    /**
-     * 이미지 파일 스코프
-     */
-    public function scopeImages($query)
-    {
-        return $query->where('is_image', true);
-    }
-
-    /**
-     * 일반 파일 스코프
-     */
-    public function scopeFiles($query)
-    {
-        return $query->where('is_image', false);
-    }
-
-    /**
-     * 특정 민원의 첨부파일 스코프
-     */
-    public function scopeForComplaint($query, $complaintId)
-    {
-        return $query->where('complaint_id', $complaintId);
-    }
-
-    /**
-     * 특정 댓글의 첨부파일 스코프
-     */
-    public function scopeForComment($query, $commentId)
-    {
-        return $query->where('comment_id', $commentId);
-    }
-
-    /**
-     * 업로드자별 스코프
-     */
-    public function scopeByUploader($query, $userId)
-    {
-        return $query->where('uploaded_by', $userId);
-    }
-
-    /**
-     * 파일 타입별 스코프
-     */
-    public function scopeByMimeType($query, $mimeType)
-    {
-        return $query->where('mime_type', $mimeType);
-    }
-
-    /**
-     * 파일 확장자별 스코프
-     */
-    public function scopeByExtension($query, $extension)
-    {
-        return $query->where('extension', $extension);
-    }
-
-    /**
-     * 파일 크기별 스코프
-     */
-    public function scopeBySizeRange($query, $minSize, $maxSize)
-    {
-        return $query->whereBetween('file_size', [$minSize, $maxSize]);
-    }
-
-    /**
-     * 첨부파일 업로드 시 유효성 검증 규칙
-     */
-    public static function getValidationRules($isUpdate = false): array
-    {
-        return [
-            'file' => 'required|file|max:10240|mimes:jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar',
-            'complaint_id' => 'required|exists:complaints,id',
-            'comment_id' => 'nullable|exists:comments,id',
-        ];
-    }
-
-    /**
-     * 첨부파일 업로드 시 유효성 검증 메시지
-     */
-    public static function getValidationMessages(): array
-    {
-        return [
-            'file.required' => '파일을 선택해주세요.',
-            'file.file' => '올바른 파일을 선택해주세요.',
-            'file.max' => '파일 크기는 10MB 이하여야 합니다.',
-            'file.mimes' => '허용되지 않는 파일 형식입니다. (jpg, jpeg, png, gif, pdf, doc, docx, xls, xlsx, ppt, pptx, txt, zip, rar만 가능)',
-            'complaint_id.required' => '민원 ID는 필수입니다.',
-            'complaint_id.exists' => '존재하지 않는 민원입니다.',
-            'comment_id.exists' => '존재하지 않는 댓글입니다.',
-        ];
-    }
-
-    /**
-     * 허용되는 파일 확장자 목록
-     */
-    public static function getAllowedExtensions(): array
-    {
-        return [
-            'images' => ['jpg', 'jpeg', 'png', 'gif'],
-            'documents' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'],
-            'archives' => ['zip', 'rar'],
-        ];
-    }
-
-    /**
-     * 파일 크기 제한 (바이트)
-     */
-    public static function getMaxFileSize(): int
-    {
-        return 10 * 1024 * 1024; // 10MB
     }
 }

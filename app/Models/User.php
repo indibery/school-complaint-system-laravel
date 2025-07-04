@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -361,4 +362,77 @@ class User extends Authenticatable
             'phone.regex' => '올바른 휴대폰 번호 형식을 입력해주세요.',
         ];
     }
-}
+}    /**
+     * Check if user has specific role(s).
+     */
+    public function hasRole($roles)
+    {
+        if (is_string($roles)) {
+            return $this->role === $roles;
+        }
+        
+        if (is_array($roles)) {
+            return in_array($this->role, $roles);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin()
+    {
+        return $this->hasRole(['admin', 'super_admin']);
+    }
+
+    /**
+     * Check if user is teacher.
+     */
+    public function isTeacher()
+    {
+        return $this->hasRole('teacher');
+    }
+
+    /**
+     * Check if user is parent.
+     */
+    public function isParent()
+    {
+        return $this->hasRole('parent');
+    }
+
+    /**
+     * Check if user is staff.
+     */
+    public function isStaff()
+    {
+        return $this->hasRole(['staff', 'security_staff', 'ops_staff']);
+    }
+
+    /**
+     * Get user role label.
+     */
+    public function getRoleLabelAttribute()
+    {
+        $roles = [
+            'admin' => '관리자',
+            'super_admin' => '최고관리자',
+            'department_head' => '부서장',
+            'teacher' => '교사',
+            'parent' => '학부모',
+            'staff' => '교직원',
+            'security_staff' => '보안직원',
+            'ops_staff' => '운영직원',
+        ];
+
+        return $roles[$this->role] ?? '알 수 없음';
+    }
+
+    /**
+     * Get user status label.
+     */
+    public function getStatusLabelAttribute()
+    {
+        return $this->status === 'active' ? '활성' : '비활성';
+    }

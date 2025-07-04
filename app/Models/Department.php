@@ -2,92 +2,57 @@
 
 namespace App\Models;
 
-use App\Enums\DepartmentType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Department extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'code',
-        'type',
-        'manager_id',
-        'parent_id',
-        'phone',
-        'email',
         'description',
-        'is_active',
+        'head_id',
+        'status',
+        'contact_email',
+        'contact_phone',
+        'location',
+        'budget',
+        'established_date',
+        'metadata',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'type' => DepartmentType::class,
-        'is_active' => 'boolean',
+        'budget' => 'decimal:2',
+        'established_date' => 'date',
+        'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
     /**
-     * The attributes that should be mutated to dates.
-     *
-     * @var array<string>
+     * 부서장
      */
-    protected $dates = [
-        'created_at',
-        'updated_at',
-        'deleted_at',
-    ];
-
-    /**
-     * 부서장 (관리자)
-     */
-    public function manager(): BelongsTo
+    public function head(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'manager_id');
+        return $this->belongsTo(User::class, 'head_id');
     }
 
     /**
-     * 상위 부서
+     * 부서원들
      */
-    public function parent(): BelongsTo
+    public function members(): HasMany
     {
-        return $this->belongsTo(Department::class, 'parent_id');
+        return $this->hasMany(User::class, 'department_id');
     }
 
     /**
-     * 하위 부서들
-     */
-    public function children(): HasMany
-    {
-        return $this->hasMany(Department::class, 'parent_id');
-    }
-
-    /**
-     * 부서 소속 사용자들
-     */
-    public function users(): HasMany
-    {
-        return $this->hasMany(User::class);
-    }
-
-    /**
-     * 부서로 배정된 민원들
+     * 부서 민원들
      */
     public function complaints(): HasMany
     {
@@ -95,139 +60,305 @@ class Department extends Model
     }
 
     /**
-     * 부서의 모든 하위 부서들 (재귀적)
-     */
-    public function allChildren(): HasMany
-    {
-        return $this->hasMany(Department::class, 'parent_id')->with('allChildren');
-    }
-
-    /**
-     * 부서의 모든 상위 부서들 (재귀적)
-     */
-    public function allParents(): BelongsTo
-    {
-        return $this->belongsTo(Department::class, 'parent_id')->with('allParents');
-    }
-
-    /**
-     * 부서의 활성 사용자들
-     */
-    public function activeUsers(): HasMany
-    {
-        return $this->hasMany(User::class)->where('is_active', true);
-    }
-
-    /**
-     * 부서의 진행 중인 민원들
+     * 활성 민원들
      */
     public function activeComplaints(): HasMany
     {
-        return $this->complaints()->whereNotIn('status', [
-            \App\Enums\ComplaintStatus::RESOLVED,
-            \App\Enums\ComplaintStatus::CLOSED
-        ]);
+        return $this->hasMany(Complaint::class)
+            ->whereNotIn('status', ['closed', 'cancelled']);
     }
 
     /**
-     * 활성 부서 여부
-     */
-    public function isActive(): bool
-    {
-        return $this->is_active;
-    }
-
-    /**
-     * 최상위 부서 여부
-     */
-    public function isRoot(): bool
-    {
-        return is_null($this->parent_id);
-    }
-
-    /**
-     * 전체 부서 경로 반환
-     */
-    public function getFullPathAttribute(): string
-    {
-        $path = collect([$this->name]);
-        $parent = $this->parent;
-        
-        while ($parent) {
-            $path->prepend($parent->name);
-            $parent = $parent->parent;
-        }
-        
-        return $path->join(' > ');
-    }
-
-    /**
-     * 활성 부서 스코프
+     * 스코프: 활성 부서
      */
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('status', 'active');
     }
 
     /**
-     * 부서 타입별 스코프
+     * 스코프: 비활성 부서
      */
-    public function scopeByType($query, DepartmentType $type)
+    public function scopeInactive($query)
     {
-        return $query->where('type', $type);
+        return $query->where('status', 'inactive');
     }
 
     /**
-     * 최상위 부서 스코프
+     * 스코프: 부서명으로 검색
      */
-    public function scopeRoot($query)
+    public function scopeSearch($query, string $term)
     {
-        return $query->whereNull('parent_id');
+        return $query->where('name', 'like', "%{$term}%")
+                    ->orWhere('code', 'like', "%{$term}%")
+                    ->orWhere('description', 'like', "%{$term}%");
     }
 
     /**
-     * 하위 부서 스코프
+     * 부서원 수 조회
      */
-    public function scopeChildren($query)
+    public function getMembersCount(): int
     {
-        return $query->whereNotNull('parent_id');
+        return $this->members()->count();
     }
 
     /**
-     * 부서 생성 시 유효성 검증 규칙
+     * 활성 부서원 수 조회
      */
-    public static function getValidationRules($isUpdate = false): array
+    public function getActiveMembersCount(): int
+    {
+        return $this->members()->where('status', 'active')->count();
+    }
+
+    /**
+     * 부서 민원 수 조회
+     */
+    public function getComplaintsCount(): int
+    {
+        return $this->complaints()->count();
+    }
+
+    /**
+     * 활성 민원 수 조회
+     */
+    public function getActiveComplaintsCount(): int
+    {
+        return $this->activeComplaints()->count();
+    }
+
+    /**
+     * 부서장 여부 확인
+     */
+    public function hasHead(): bool
+    {
+        return !is_null($this->head_id);
+    }
+
+    /**
+     * 부서원 존재 여부 확인
+     */
+    public function hasMembers(): bool
+    {
+        return $this->members()->exists();
+    }
+
+    /**
+     * 민원 존재 여부 확인
+     */
+    public function hasComplaints(): bool
+    {
+        return $this->complaints()->exists();
+    }
+
+    /**
+     * 사용자가 부서장인지 확인
+     */
+    public function isHead(User $user): bool
+    {
+        return $this->head_id === $user->id;
+    }
+
+    /**
+     * 사용자가 부서원인지 확인
+     */
+    public function isMember(User $user): bool
+    {
+        return $user->department_id === $this->id;
+    }
+
+    /**
+     * 부서장 설정
+     */
+    public function setHead(User $user): void
+    {
+        // 기존 부서장 해제
+        if ($this->head_id) {
+            $oldHead = $this->head;
+            if ($oldHead) {
+                $oldHead->update(['department_id' => null]);
+            }
+        }
+
+        // 새 부서장 설정
+        $this->update(['head_id' => $user->id]);
+        $user->update(['department_id' => $this->id]);
+    }
+
+    /**
+     * 부서원 추가
+     */
+    public function addMember(User $user): void
+    {
+        $user->update(['department_id' => $this->id]);
+    }
+
+    /**
+     * 부서원 제거
+     */
+    public function removeMember(User $user): void
+    {
+        if ($this->isHead($user)) {
+            throw new \Exception('부서장은 부서에서 제거할 수 없습니다.');
+        }
+
+        $user->update(['department_id' => null]);
+    }
+
+    /**
+     * 부서 활성화
+     */
+    public function activate(): void
+    {
+        $this->update(['status' => 'active']);
+    }
+
+    /**
+     * 부서 비활성화
+     */
+    public function deactivate(): void
+    {
+        $this->update(['status' => 'inactive']);
+    }
+
+    /**
+     * 부서 상태 토글
+     */
+    public function toggleStatus(): void
+    {
+        $newStatus = $this->status === 'active' ? 'inactive' : 'active';
+        $this->update(['status' => $newStatus]);
+    }
+
+    /**
+     * 부서 통계 조회
+     */
+    public function getStatistics(): array
     {
         return [
-            'name' => 'required|string|max:100|regex:/^[가-힣a-zA-Z0-9\s\-()]+$/',
-            'code' => 'required|string|max:10|unique:departments,code|regex:/^[A-Z0-9]+$/',
-            'type' => 'required|in:' . implode(',', DepartmentType::getValues()),
-            'manager_id' => 'nullable|exists:users,id',
-            'parent_id' => 'nullable|exists:departments,id',
-            'phone' => 'nullable|string|regex:/^0[0-9]{1,2}-?[0-9]{3,4}-?[0-9]{4}$/',
-            'email' => 'nullable|email|max:255',
-            'description' => 'nullable|string|max:1000',
+            'members_count' => $this->getMembersCount(),
+            'active_members_count' => $this->getActiveMembersCount(),
+            'complaints_count' => $this->getComplaintsCount(),
+            'active_complaints_count' => $this->getActiveComplaintsCount(),
+            'completed_complaints_count' => $this->complaints()->where('status', 'closed')->count(),
+            'pending_complaints_count' => $this->complaints()->where('status', 'pending')->count(),
+            'in_progress_complaints_count' => $this->complaints()->where('status', 'in_progress')->count(),
+            'avg_resolution_time' => $this->getAverageResolutionTime(),
+            'satisfaction_rating' => $this->getAverageSatisfactionRating(),
         ];
     }
 
     /**
-     * 부서 생성 시 유효성 검증 메시지
+     * 평균 해결 시간 계산 (시간 단위)
      */
-    public static function getValidationMessages(): array
+    public function getAverageResolutionTime(): ?float
     {
-        return [
-            'name.required' => '부서명은 필수입니다.',
-            'name.regex' => '부서명은 한글, 영문, 숫자, 공백, 하이픈, 괄호만 입력 가능합니다.',
-            'code.required' => '부서 코드는 필수입니다.',
-            'code.unique' => '이미 사용 중인 부서 코드입니다.',
-            'code.regex' => '부서 코드는 영문 대문자와 숫자만 입력 가능합니다.',
-            'type.required' => '부서 타입은 필수입니다.',
-            'type.in' => '올바른 부서 타입을 선택해주세요.',
-            'manager_id.exists' => '존재하지 않는 사용자입니다.',
-            'parent_id.exists' => '존재하지 않는 상위 부서입니다.',
-            'phone.regex' => '올바른 전화번호 형식을 입력해주세요. (예: 02-1234-5678)',
-            'email.email' => '올바른 이메일 형식을 입력해주세요.',
-            'description.max' => '설명은 최대 1000자까지 입력 가능합니다.',
-        ];
+        $resolvedComplaints = $this->complaints()
+            ->whereNotNull('resolved_at')
+            ->get();
+
+        if ($resolvedComplaints->isEmpty()) {
+            return null;
+        }
+
+        $totalHours = $resolvedComplaints->sum(function ($complaint) {
+            return $complaint->created_at->diffInHours($complaint->resolved_at);
+        });
+
+        return round($totalHours / $resolvedComplaints->count(), 1);
+    }
+
+    /**
+     * 평균 만족도 계산
+     */
+    public function getAverageSatisfactionRating(): ?float
+    {
+        $avg = $this->complaints()
+            ->whereNotNull('satisfaction_rating')
+            ->avg('satisfaction_rating');
+
+        return $avg ? round($avg, 1) : null;
+    }
+
+    /**
+     * 월별 민원 데이터 조회
+     */
+    public function getMonthlyComplaintsData(int $months = 12): array
+    {
+        $data = [];
+        
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $count = $this->complaints()
+                ->whereYear('created_at', $date->year)
+                ->whereMonth('created_at', $date->month)
+                ->count();
+                
+            $data[] = [
+                'month' => $date->format('Y-m'),
+                'count' => $count,
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * 카테고리별 민원 분포
+     */
+    public function getComplaintsByCategory(): array
+    {
+        return $this->complaints()
+            ->join('categories', 'complaints.category_id', '=', 'categories.id')
+            ->select('categories.name', \DB::raw('COUNT(*) as count'))
+            ->groupBy('categories.id', 'categories.name')
+            ->orderByDesc('count')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * 부서 최고 성과자 조회
+     */
+    public function getTopPerformers(int $limit = 5): array
+    {
+        return $this->members()
+            ->join('complaints', 'users.id', '=', 'complaints.assigned_to')
+            ->where('complaints.status', 'closed')
+            ->select('users.name', \DB::raw('COUNT(*) as resolved_count'))
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc('resolved_count')
+            ->limit($limit)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * 부서 삭제 가능 여부 확인
+     */
+    public function canDelete(): bool
+    {
+        return !$this->hasMembers() && !$this->hasComplaints();
+    }
+
+    /**
+     * 부서 정보 검증
+     */
+    public function validate(): array
+    {
+        $errors = [];
+
+        if (!$this->hasHead()) {
+            $errors[] = '부서장이 지정되지 않았습니다.';
+        }
+
+        if (!$this->hasMembers()) {
+            $errors[] = '부서원이 없습니다.';
+        }
+
+        if ($this->status === 'inactive' && $this->hasComplaints()) {
+            $errors[] = '처리 중인 민원이 있는 부서는 비활성화할 수 없습니다.';
+        }
+
+        return $errors;
     }
 }

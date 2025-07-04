@@ -12,44 +12,29 @@ class Comment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * 기본적으로 로드할 관계들
-     *
-     * @var array<string>
-     */
-    protected $with = ['user'];
-
-    /**
-     * 관계 로딩 시 카운트할 관계들
-     *
-     * @var array<string>
-     */
-    protected $withCount = ['replies', 'attachments'];
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'complaint_id',
-        'user_id',
-        'content',
-        'is_internal',
+        'author_id',
         'parent_id',
+        'content',
+        'is_private',
+        'is_edited',
+        'is_deleted',
+        'edited_at',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
-        'is_internal' => 'boolean',
+        'is_private' => 'boolean',
+        'is_edited' => 'boolean',
+        'is_deleted' => 'boolean',
+        'edited_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     /**
-     * 댓글이 속한 민원
+     * 민원
      */
     public function complaint(): BelongsTo
     {
@@ -57,15 +42,15 @@ class Comment extends Model
     }
 
     /**
-     * 댓글 작성자
+     * 작성자
      */
-    public function user(): BelongsTo
+    public function author(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'author_id');
     }
 
     /**
-     * 상위 댓글 (답글인 경우)
+     * 부모 댓글
      */
     public function parent(): BelongsTo
     {
@@ -73,7 +58,7 @@ class Comment extends Model
     }
 
     /**
-     * 하위 댓글들 (답글들)
+     * 답글들
      */
     public function replies(): HasMany
     {
@@ -81,7 +66,7 @@ class Comment extends Model
     }
 
     /**
-     * 댓글 첨부파일들
+     * 첨부파일들
      */
     public function attachments(): HasMany
     {
@@ -89,97 +74,7 @@ class Comment extends Model
     }
 
     /**
-     * 댓글의 모든 하위 댓글들 (재귀적)
-     */
-    public function allReplies(): HasMany
-    {
-        return $this->hasMany(Comment::class, 'parent_id')->with('allReplies');
-    }
-
-    /**
-     * 댓글의 이미지 첨부파일들
-     */
-    public function imageAttachments(): HasMany
-    {
-        return $this->hasMany(Attachment::class)->where('is_image', true);
-    }
-
-    /**
-     * 댓글의 일반 첨부파일들
-     */
-    public function fileAttachments(): HasMany
-    {
-        return $this->hasMany(Attachment::class)->where('is_image', false);
-    }
-
-    /**
-     * 최상위 댓글 여부
-     */
-    public function isTopLevel(): bool
-    {
-        return is_null($this->parent_id);
-    }
-
-    /**
-     * 답글 여부
-     */
-    public function isReply(): bool
-    {
-        return !is_null($this->parent_id);
-    }
-
-    /**
-     * 내부 댓글 여부 (교직원만 볼 수 있는 댓글)
-     */
-    public function isInternal(): bool
-    {
-        return $this->is_internal;
-    }
-
-    /**
-     * 공개 댓글 여부
-     */
-    public function isPublic(): bool
-    {
-        return !$this->is_internal;
-    }
-
-    /**
-     * 댓글 수정 가능 여부
-     */
-    public function canEdit(User $user): bool
-    {
-        // 작성자 본인이거나 관리자인 경우
-        return $this->user_id === $user->id || $user->isAdmin();
-    }
-
-    /**
-     * 댓글 삭제 가능 여부
-     */
-    public function canDelete(User $user): bool
-    {
-        // 작성자 본인이거나 관리자인 경우
-        return $this->user_id === $user->id || $user->isAdmin();
-    }
-
-    /**
-     * 공개 댓글 스코프
-     */
-    public function scopePublic($query)
-    {
-        return $query->where('is_internal', false);
-    }
-
-    /**
-     * 내부 댓글 스코프
-     */
-    public function scopeInternal($query)
-    {
-        return $query->where('is_internal', true);
-    }
-
-    /**
-     * 최상위 댓글 스코프
+     * 스코프: 최상위 댓글 (답글이 아닌)
      */
     public function scopeTopLevel($query)
     {
@@ -187,7 +82,7 @@ class Comment extends Model
     }
 
     /**
-     * 답글 스코프
+     * 스코프: 답글들
      */
     public function scopeReplies($query)
     {
@@ -195,62 +90,101 @@ class Comment extends Model
     }
 
     /**
-     * 특정 민원의 댓글 스코프
+     * 스코프: 공개 댓글
      */
-    public function scopeForComplaint($query, $complaintId)
+    public function scopePublic($query)
     {
-        return $query->where('complaint_id', $complaintId);
+        return $query->where('is_private', false);
     }
 
     /**
-     * 작성자별 댓글 스코프
+     * 스코프: 비공개 댓글
      */
-    public function scopeByUser($query, $userId)
+    public function scopePrivate($query)
     {
-        return $query->where('user_id', $userId);
+        return $query->where('is_private', true);
     }
 
     /**
-     * 최근 댓글 순 정렬
+     * 스코프: 삭제되지 않은 댓글
      */
-    public function scopeLatest($query)
+    public function scopeNotDeleted($query)
     {
-        return $query->orderBy('created_at', 'desc');
+        return $query->where('is_deleted', false);
     }
 
     /**
-     * 오래된 댓글 순 정렬
+     * 댓글 수정 처리
      */
-    public function scopeOldest($query)
+    public function markAsEdited(): void
     {
-        return $query->orderBy('created_at', 'asc');
+        $this->update([
+            'is_edited' => true,
+            'edited_at' => now(),
+        ]);
     }
 
     /**
-     * 댓글 생성 시 유효성 검증 규칙
+     * 댓글 삭제 처리 (소프트 삭제)
      */
-    public static function getValidationRules($isUpdate = false): array
+    public function markAsDeleted(): void
     {
-        return [
-            'content' => 'required|string|min:5|max:2000',
-            'complaint_id' => 'required|exists:complaints,id',
-            'parent_id' => 'nullable|exists:comments,id',
-            'is_internal' => 'boolean',
-        ];
+        $this->update([
+            'content' => '삭제된 댓글입니다.',
+            'is_deleted' => true,
+            'deleted_at' => now(),
+        ]);
     }
 
     /**
-     * 댓글 생성 시 유효성 검증 메시지
+     * 답글 여부 확인
      */
-    public static function getValidationMessages(): array
+    public function isReply(): bool
     {
-        return [
-            'content.required' => '댓글 내용은 필수입니다.',
-            'content.min' => '댓글 내용은 최소 5자 이상 입력해주세요.',
-            'content.max' => '댓글 내용은 최대 2,000자까지 입력 가능합니다.',
-            'complaint_id.required' => '민원 ID는 필수입니다.',
-            'complaint_id.exists' => '존재하지 않는 민원입니다.',
-            'parent_id.exists' => '존재하지 않는 상위 댓글입니다.',
-        ];
+        return !is_null($this->parent_id);
+    }
+
+    /**
+     * 답글 존재 여부 확인
+     */
+    public function hasReplies(): bool
+    {
+        return $this->replies()->exists();
+    }
+
+    /**
+     * 수정 가능 여부 확인
+     */
+    public function canEdit(User $user): bool
+    {
+        // 관리자는 모든 댓글 수정 가능
+        if ($user->hasRole(['admin', 'super_admin'])) {
+            return true;
+        }
+
+        // 작성자는 자신의 댓글 수정 가능 (24시간 이내)
+        if ($this->author_id === $user->id) {
+            return $this->created_at->diffInHours(now()) <= 24;
+        }
+
+        return false;
+    }
+
+    /**
+     * 삭제 가능 여부 확인
+     */
+    public function canDelete(User $user): bool
+    {
+        // 관리자는 모든 댓글 삭제 가능
+        if ($user->hasRole(['admin', 'super_admin'])) {
+            return true;
+        }
+
+        // 작성자는 자신의 댓글 삭제 가능
+        if ($this->author_id === $user->id) {
+            return true;
+        }
+
+        return false;
     }
 }
