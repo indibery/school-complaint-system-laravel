@@ -19,21 +19,49 @@ class ComplaintFactory extends Factory
      */
     public function definition(): array
     {
-        $priorities = ['low', 'medium', 'high', 'urgent'];
-        $statuses = ['pending', 'in_progress', 'resolved', 'closed'];
+        $priorities = ['low', 'normal', 'high', 'urgent'];
+        $statuses = ['submitted', 'in_progress', 'resolved', 'closed'];
+        
+        // 랜덤 학부모 선택
+        $parent = User::where('role', 'parent')->inRandomOrder()->first();
+        
+        // 랜덤 카테고리 선택
+        $category = Category::inRandomOrder()->first();
+        
+        // 학부모의 자녀 중 랜덤 선택 (있다면)
+        $student = null;
+        if ($parent) {
+            $student = Student::where('parent_id', $parent->id)->inRandomOrder()->first();
+        }
         
         return [
+            'user_id' => $parent?->id ?? User::where('role', 'parent')->first()?->id,
+            'student_id' => $student?->id,
+            'category_id' => $category?->id ?? 1,
             'title' => fake()->sentence(4),
             'content' => fake()->paragraphs(3, true),
             'priority' => fake()->randomElement($priorities),
             'status' => fake()->randomElement($statuses),
-            'is_anonymous' => fake()->boolean(20), // 20% 확률로 익명
+            'complainant_name' => $parent?->name ?? fake()->name(),
+            'complainant_email' => $parent?->email ?? fake()->email(),
+            'complainant_phone' => fake()->phoneNumber(),
             'incident_date' => fake()->optional(0.8)->dateTimeBetween('-30 days', 'now'),
             'incident_location' => fake()->optional(0.6)->randomElement([
                 '교실', '운동장', '급식실', '화장실', '복도', '도서관', '체육관', '과학실', '음악실', '미술실'
             ]),
+            'complaint_number' => $this->generateComplaintNumber(),
             'created_at' => fake()->dateTimeBetween('-60 days', 'now'),
         ];
+    }
+
+    /**
+     * 민원번호 생성
+     */
+    private function generateComplaintNumber(): string
+    {
+        $date = now()->format('Ymd');
+        $sequence = fake()->numberBetween(1, 999);
+        return $date . '-' . str_pad($sequence, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -42,7 +70,9 @@ class ComplaintFactory extends Factory
     public function byParent(User $parent): static
     {
         return $this->state(fn (array $attributes) => [
-            'complainant_id' => $parent->id,
+            'user_id' => $parent->id,
+            'complainant_name' => $parent->name,
+            'complainant_email' => $parent->email,
         ]);
     }
 
@@ -98,16 +128,6 @@ class ComplaintFactory extends Factory
     }
 
     /**
-     * Create an anonymous complaint
-     */
-    public function anonymous(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'is_anonymous' => true,
-        ]);
-    }
-
-    /**
      * Create a resolved complaint
      */
     public function resolved(): static
@@ -129,4 +149,3 @@ class ComplaintFactory extends Factory
         ]);
     }
 }
-

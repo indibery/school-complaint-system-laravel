@@ -751,7 +751,6 @@ class ComplaintController extends BaseApiController
                 ->count(),
         ];
     }
-}
 
     /**
      * Update complaint status.
@@ -1593,3 +1592,4 @@ class ComplaintController extends BaseApiController
             );
         }
     }
+}

@@ -6,30 +6,32 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Comment extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'complaint_id',
-        'author_id',
+        'user_id',
         'parent_id',
         'content',
+        'type',
+        'is_public',
         'is_private',
-        'is_edited',
         'is_deleted',
+        'is_edited',
         'edited_at',
     ];
 
     protected $casts = [
+        'is_public' => 'boolean',
         'is_private' => 'boolean',
-        'is_edited' => 'boolean',
         'is_deleted' => 'boolean',
-        'edited_at' => 'datetime',
+        'is_edited' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'edited_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
@@ -44,9 +46,9 @@ class Comment extends Model
     /**
      * 작성자
      */
-    public function author(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'author_id');
+        return $this->belongsTo(User::class);
     }
 
     /**
@@ -163,7 +165,7 @@ class Comment extends Model
         }
 
         // 작성자는 자신의 댓글 수정 가능 (24시간 이내)
-        if ($this->author_id === $user->id) {
+        if ($this->user_id === $user->id) {
             return $this->created_at->diffInHours(now()) <= 24;
         }
 
@@ -181,7 +183,7 @@ class Comment extends Model
         }
 
         // 작성자는 자신의 댓글 삭제 가능
-        if ($this->author_id === $user->id) {
+        if ($this->user_id === $user->id) {
             return true;
         }
 

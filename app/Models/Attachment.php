@@ -15,21 +15,14 @@ class Attachment extends Model
         'complaint_id',
         'comment_id',
         'original_name',
-        'file_name',
-        'path',
-        'disk',
+        'file_path',
+        'file_size',
         'mime_type',
-        'size',
-        'thumbnail_path',
         'uploaded_by',
-        'download_count',
-        'metadata',
     ];
 
     protected $casts = [
-        'size' => 'integer',
-        'download_count' => 'integer',
-        'metadata' => 'array',
+        'file_size' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -53,7 +46,7 @@ class Attachment extends Model
     /**
      * 업로드한 사용자
      */
-    public function uploadedBy(): BelongsTo
+    public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }

@@ -76,17 +76,6 @@ class UserSeeder extends Seeder
                 'phone' => '02-1234-5682',
                 'is_active' => true,
             ],
-        ];
-
-        foreach ($users as $user) {
-            DB::table('users')->insert(array_merge($user, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
-        }
-    }
-}
-
             
             // 학부모들
             [
@@ -129,3 +118,13 @@ class UserSeeder extends Seeder
                 'phone' => '010-1234-5681',
                 'is_active' => true,
             ],
+        ];
+
+        foreach ($users as $user) {
+            DB::table('users')->insert(array_merge($user, [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+        }
+    }
+}

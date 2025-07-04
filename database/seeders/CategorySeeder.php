@@ -65,17 +65,6 @@ class CategorySeeder extends Seeder
                 'sort_order' => 3,
                 'is_active' => true,
             ],
-        ];
-
-        foreach ($categories as $category) {
-            DB::table('categories')->insert(array_merge($category, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
-        }
-    }
-}
-
             
             // 급식 관련
             [
@@ -102,7 +91,7 @@ class CategorySeeder extends Seeder
             
             // 안전 관련
             [
-                'name' => '안전/보안',
+                'name' => '교통/안전',
                 'description' => '학교 안전 및 보안 관련 민원',
                 'parent_id' => null,
                 'sort_order' => 4,
@@ -156,6 +145,11 @@ class CategorySeeder extends Seeder
             ],
         ];
 
-        DB::table('categories')->insert($categories);
+        foreach ($categories as $category) {
+            DB::table('categories')->insert(array_merge($category, [
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]));
+        }
     }
 }

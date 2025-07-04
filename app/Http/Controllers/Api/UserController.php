@@ -311,7 +311,6 @@ class UserController extends BaseApiController
         
         return [$sortBy, $sortOrder];
     }
-}
 
     /**
      * Update user status (activate/deactivate).
@@ -1260,3 +1259,4 @@ class UserController extends BaseApiController
             );
         }
     }
+}

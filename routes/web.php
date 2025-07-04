@@ -47,6 +47,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/{complaint}', [ComplaintController::class, 'update'])->name('update');
         Route::delete('/{complaint}', [ComplaintController::class, 'destroy'])->name('destroy');
         
+        // 대량 업데이트
+        Route::post('/bulk-update', [ComplaintController::class, 'bulkUpdate'])->name('bulk-update');
+        
+        // 내보내기
+        Route::get('/export', [ComplaintController::class, 'export'])->name('export');
+        
         // 민원 상태 변경
         Route::patch('/{complaint}/status', [ComplaintController::class, 'updateStatus'])->name('update-status');
         Route::patch('/{complaint}/assign', [ComplaintController::class, 'assign'])->name('assign');
