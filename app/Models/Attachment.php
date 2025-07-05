@@ -247,3 +247,119 @@ class Attachment extends Model
         }
     }
 }
+    /**
+     * 파일 크기를 사람이 읽기 쉬운 형태로 변환
+     */
+    public function getFileSizeHumanAttribute(): string
+    {
+        $bytes = $this->file_size;
+        $units = ['B', 'KB', 'MB', 'GB'];
+        
+        for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
+            $bytes /= 1024;
+        }
+        
+        return round($bytes, 2) . ' ' . $units[$i];
+    }
+    
+    /**
+     * 파일 확장자 가져오기
+     */
+    public function getFileExtensionAttribute(): string
+    {
+        return pathinfo($this->original_name, PATHINFO_EXTENSION);
+    }
+    
+    /**
+     * 파일 타입별 아이콘 클래스 반환
+     */
+    public function getIconClassAttribute(): string
+    {
+        $extension = strtolower($this->file_extension);
+        
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'])) {
+            return 'image';
+        } elseif (in_array($extension, ['pdf'])) {
+            return 'pdf';
+        } elseif (in_array($extension, ['doc', 'docx', 'hwp'])) {
+            return 'doc';
+        } elseif (in_array($extension, ['xlsx', 'xls', 'csv'])) {
+            return 'excel';
+        } elseif (in_array($extension, ['zip', 'rar', '7z'])) {
+            return 'archive';
+        } else {
+            return 'default';
+        }
+    }
+    
+    /**
+     * 파일 타입별 Bootstrap 아이콘 반환
+     */
+    public function getIconAttribute(): string
+    {
+        $iconClass = $this->icon_class;
+        
+        $icons = [
+            'image' => 'image',
+            'pdf' => 'file-pdf',
+            'doc' => 'file-word',
+            'excel' => 'file-excel',
+            'archive' => 'file-zip',
+            'default' => 'file-earmark',
+        ];
+        
+        return $icons[$iconClass] ?? 'file-earmark';
+    }
+    
+    /**
+     * 이미지 파일 여부 확인
+     */
+    public function getIsImageAttribute(): bool
+    {
+        return $this->icon_class === 'image';
+    }
+    
+    /**
+     * 파일 다운로드 URL 생성
+     */
+    public function getDownloadUrlAttribute(): string
+    {
+        return route('complaints.download-attachment', [
+            'complaint' => $this->complaint_id,
+            'attachment' => $this->id
+        ]);
+    }
+    
+    /**
+     * 파일 미리보기 URL 생성 (이미지만)
+     */
+    public function getPreviewUrlAttribute(): ?string
+    {
+        if (!$this->is_image) {
+            return null;
+        }
+        
+        return Storage::disk('public')->url($this->file_path);
+    }
+    
+    /**
+     * 파일 존재 여부 확인
+     */
+    public function getFileExistsAttribute(): bool
+    {
+        return Storage::disk('public')->exists($this->file_path);
+    }
+    
+    /**
+     * 파일 삭제 시 실제 파일도 삭제
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::deleting(function ($attachment) {
+            if (Storage::disk('public')->exists($attachment->file_path)) {
+                Storage::disk('public')->delete($attachment->file_path);
+            }
+        });
+    }

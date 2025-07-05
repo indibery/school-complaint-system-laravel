@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use App\Models\Category;
 use App\Models\User;
+use App\Models\Comment;
+use App\Models\Attachment;
 use App\Models\ComplaintStatusLog;
 use App\Notifications\ComplaintAssigned;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ComplaintController extends Controller
@@ -680,5 +683,380 @@ class ComplaintController extends Controller
         ];
 
         return $priorityLabels[$priority] ?? $priority;
+    }
+}
+        ];
+    }
+
+    /**
+     * 민원 번호 생성
+     */
+    private function generateComplaintNumber()
+    {
+        $today = now()->format('Ymd');
+        $count = Complaint::whereDate('created_at', today())->count() + 1;
+        
+        return $today . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * 민원 상태 변경
+     */
+    public function updateStatus(Request $request, Complaint $complaint)
+    {
+        $this->authorize('update', $complaint);
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,in_progress,resolved,closed',
+            'comment' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $oldStatus = $complaint->status;
+            $complaint->update(['status' => $validated['status']]);
+
+            // 상태 로그 생성
+            $complaint->statusLogs()->create([
+                'status' => $validated['status'],
+                'comment' => $validated['comment'] ?? "상태가 '{$oldStatus}'에서 '{$validated['status']}'로 변경되었습니다.",
+                'user_id' => Auth::id(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => '민원 상태가 성공적으로 변경되었습니다.',
+                'status' => $validated['status']
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('민원 상태 변경 실패: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => '민원 상태 변경에 실패했습니다.'
+            ], 500);
+        }
+    }
+
+    /**
+     * 민원 담당자 할당
+     */
+    public function assignUser(Request $request, Complaint $complaint)
+    {
+        $this->authorize('update', $complaint);
+
+        $validated = $request->validate([
+            'assigned_to' => 'required|exists:users,id',
+            'comment' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $assignee = User::find($validated['assigned_to']);
+            $complaint->update(['assigned_to' => $validated['assigned_to']]);
+
+            // 상태 로그 생성
+            $complaint->statusLogs()->create([
+                'status' => $complaint->status,
+                'comment' => $validated['comment'] ?? "담당자가 '{$assignee->name}'님으로 할당되었습니다.",
+                'user_id' => Auth::id(),
+            ]);
+
+            // 담당자에게 알림 발송
+            $assignee->notify(new ComplaintAssigned($complaint));
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => '담당자가 성공적으로 할당되었습니다.',
+                'assigned_to' => $assignee->name
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('담당자 할당 실패: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => '담당자 할당에 실패했습니다.'
+            ], 500);
+        }
+    }
+
+    /**
+     * 민원 우선순위 변경
+     */
+    public function updatePriority(Request $request, Complaint $complaint)
+    {
+        $this->authorize('update', $complaint);
+
+        $validated = $request->validate([
+            'priority' => 'required|in:low,normal,high,urgent',
+            'comment' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $oldPriority = $complaint->priority;
+            $complaint->update(['priority' => $validated['priority']]);
+
+            // 상태 로그 생성
+            $complaint->statusLogs()->create([
+                'status' => $complaint->status,
+                'comment' => $validated['comment'] ?? "우선순위가 '{$oldPriority}'에서 '{$validated['priority']}'로 변경되었습니다.",
+                'user_id' => Auth::id(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => '민원 우선순위가 성공적으로 변경되었습니다.',
+                'priority' => $validated['priority']
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('민원 우선순위 변경 실패: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => '민원 우선순위 변경에 실패했습니다.'
+            ], 500);
+        }
+    }
+
+    /**
+     * 민원 검색 (AJAX)
+     */
+    public function search(Request $request)
+    {
+        $query = $request->input('query');
+        
+        if (empty($query)) {
+            return response()->json([
+                'success' => false,
+                'message' => '검색어를 입력해주세요.'
+            ]);
+        }
+
+        $complaints = Complaint::with(['category', 'complainant', 'assignedTo'])
+            ->where(function ($q) use ($query) {
+                $q->where('title', 'LIKE', "%{$query}%")
+                  ->orWhere('content', 'LIKE', "%{$query}%")
+                  ->orWhere('complaint_number', 'LIKE', "%{$query}%");
+            })
+            ->limit(10)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $complaints->map(function ($complaint) {
+                return [
+                    'id' => $complaint->id,
+                    'title' => $complaint->title,
+                    'complaint_number' => $complaint->complaint_number,
+                    'status' => $complaint->status,
+                    'priority' => $complaint->priority,
+                    'category' => $complaint->category->name,
+                    'complainant' => $complaint->complainant->name,
+                    'created_at' => $complaint->created_at->format('Y-m-d H:i'),
+                    'url' => route('complaints.show', $complaint)
+                ];
+            })
+        ]);
+    }
+
+    /**
+     * 민원 내보내기 (Excel)
+     */
+    public function export(Request $request)
+    {
+        $this->authorize('export', Complaint::class);
+
+        $query = Complaint::with(['category', 'complainant', 'assignedTo']);
+        
+        // 같은 필터 적용
+        $this->applyAccessControl($query, $request);
+
+        // 필터링 적용
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $complaints = $query->orderBy('created_at', 'desc')->get();
+
+        // CSV 생성
+        $filename = '민원목록_' . now()->format('Y-m-d_H-i-s') . '.csv';
+        $handle = fopen('php://output', 'w');
+
+        // BOM 추가 (Excel에서 한글 깨짐 방지)
+        fwrite($handle, "\xEF\xBB\xBF");
+
+        // 헤더 추가
+        fputcsv($handle, [
+            '민원번호',
+            '제목',
+            '카테고리',
+            '상태',
+            '우선순위',
+            '민원인',
+            '담당자',
+            '등록일',
+            '수정일'
+        ]);
+
+        // 데이터 추가
+        foreach ($complaints as $complaint) {
+            fputcsv($handle, [
+                $complaint->complaint_number,
+                $complaint->title,
+                $complaint->category->name,
+                $complaint->status_text,
+                $complaint->priority_text,
+                $complaint->complainant->name,
+                $complaint->assignedTo->name ?? '미할당',
+                $complaint->created_at->format('Y-m-d H:i:s'),
+                $complaint->updated_at->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        fclose($handle);
+
+        return response()->stream(function() use ($handle) {
+            // 이미 출력됨
+        }, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * 민원 통계 (AJAX)
+     */
+    public function statistics(Request $request)
+    {
+        $this->authorize('viewStatistics', Complaint::class);
+
+        $baseQuery = Complaint::query();
+        $this->applyAccessControl($baseQuery, $request);
+
+        // 기간 필터
+        if ($request->filled('date_from')) {
+            $baseQuery->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $baseQuery->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'by_status' => [
+                'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+                'in_progress' => (clone $baseQuery)->where('status', 'in_progress')->count(),
+                'resolved' => (clone $baseQuery)->where('status', 'resolved')->count(),
+                'closed' => (clone $baseQuery)->where('status', 'closed')->count(),
+            ],
+            'by_priority' => [
+                'urgent' => (clone $baseQuery)->where('priority', 'urgent')->count(),
+                'high' => (clone $baseQuery)->where('priority', 'high')->count(),
+                'normal' => (clone $baseQuery)->where('priority', 'normal')->count(),
+                'low' => (clone $baseQuery)->where('priority', 'low')->count(),
+            ],
+            'by_category' => (clone $baseQuery)
+                ->join('categories', 'complaints.category_id', '=', 'categories.id')
+                ->select('categories.name', DB::raw('count(*) as count'))
+                ->groupBy('categories.name')
+                ->orderBy('count', 'desc')
+                ->limit(10)
+                ->get()
+                ->pluck('count', 'name'),
+            'monthly_trend' => (clone $baseQuery)
+                ->select(
+                    DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+                    DB::raw('count(*) as count')
+                )
+                ->groupBy('month')
+                ->orderBy('month')
+                ->limit(12)
+                ->get()
+                ->pluck('count', 'month'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats
+        ]);
+    }
+
+    /**
+     * 민원 첨부파일 다운로드
+     */
+    public function downloadAttachment(Complaint $complaint, $attachmentId)
+    {
+        $this->authorize('view', $complaint);
+
+        $attachment = $complaint->attachments()->findOrFail($attachmentId);
+
+        if (!\Storage::disk('public')->exists($attachment->file_path)) {
+            abort(404, '파일을 찾을 수 없습니다.');
+        }
+
+        return \Storage::disk('public')->download(
+            $attachment->file_path,
+            $attachment->original_name
+        );
+    }
+
+    /**
+     * 민원 첨부파일 삭제
+     */
+    public function deleteAttachment(Complaint $complaint, $attachmentId)
+    {
+        $this->authorize('update', $complaint);
+
+        $attachment = $complaint->attachments()->findOrFail($attachmentId);
+
+        try {
+            // 실제 파일 삭제
+            \Storage::disk('public')->delete($attachment->file_path);
+            
+            // DB에서 삭제
+            $attachment->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => '첨부파일이 성공적으로 삭제되었습니다.'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('첨부파일 삭제 실패: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => '첨부파일 삭제에 실패했습니다.'
+            ], 500);
+        }
     }
 }

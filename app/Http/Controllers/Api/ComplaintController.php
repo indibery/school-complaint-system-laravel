@@ -1593,3 +1593,78 @@ class ComplaintController extends BaseApiController
         }
     }
 }
+                    'escalation_level' => $escalationData['level'],
+                    'escalated_at' => $complaint->escalated_at->toISOString(),
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('민원 상급 이관 실패: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => '상급 이관에 실패했습니다.'
+            ], 500);
+        }
+    }
+    
+    /**
+     * 이관 데이터 가져오기
+     */
+    private function getEscalationData($target)
+    {
+        $escalationData = [
+            'department_head' => [
+                'name' => '부서장',
+                'level' => 1,
+                'description' => '부서장 검토 요청'
+            ],
+            'principal' => [
+                'name' => '교장',
+                'level' => 2,
+                'description' => '교장 검토 요청'
+            ],
+            'superintendent' => [
+                'name' => '교육청',
+                'level' => 3,
+                'description' => '교육청 검토 요청'
+            ]
+        ];
+        
+        return $escalationData[$target] ?? $escalationData['department_head'];
+    }
+    
+    /**
+     * 민원 진행률 계산
+     */
+    public function calculateProgress($complaint)
+    {
+        $statusProgress = [
+            'pending' => 10,
+            'assigned' => 25,
+            'in_progress' => 50,
+            'under_review' => 75,
+            'resolved' => 90,
+            'closed' => 100
+        ];
+        
+        $baseProgress = $statusProgress[$complaint->status] ?? 0;
+        
+        // 댓글이 있으면 +5%
+        if ($complaint->comments_count > 0) {
+            $baseProgress += 5;
+        }
+        
+        // 담당자가 있으면 +10%
+        if ($complaint->assigned_to) {
+            $baseProgress += 10;
+        }
+        
+        // 첨부파일이 있으면 +5%
+        if ($complaint->attachments_count > 0) {
+            $baseProgress += 5;
+        }
+        
+        return min(100, $baseProgress);
+    }
+}
