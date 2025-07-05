@@ -1,24 +1,45 @@
-*.log
+/vendor
+
+# Laravel 민원 시스템 관련
+/storage/app/complaints/*.pdf
+/storage/app/complaints/*.doc
+/storage/app/complaints/*.docx
+/storage/app/complaints/*.jpg
+/storage/app/complaints/*.jpeg
+/storage/app/complaints/*.png
+!/storage/app/complaints/.gitkeep
+
+# IDE 및 에디터
+/.vscode
+/.idea
+/.fleet
+/.nova
+/.zed
+/.phpactor.json
+
+# 시스템 파일
 .DS_Store
+Thumbs.db
+
+# 환경 설정
 .env
 .env.backup
 .env.production
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
 /auth.json
+
+# 의존성 및 빌드
+/vendor
 /node_modules
 /public/build
 /public/hot
 /public/storage
+
+# 로그 및 캐시
+*.log
+/.phpunit.cache
+.phpunit.result.cache
 /storage/*.key
 /storage/pail
-/vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
