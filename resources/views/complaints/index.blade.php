@@ -223,6 +223,27 @@
         margin-left: 5px;
     }
     
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .notification-alert {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+        min-width: 300px;
+    }
+    
     @media (max-width: 768px) {
         .filter-section {
             position: static;
@@ -287,7 +308,7 @@
             <p>대기 중</p>
         </div>
         <div class="stat-card">
-            <h5 id="statInProgress">{{ $stats['in_progress'] ?? 0 }}</h5>
+            <h5 id="statInprogress">{{ $stats['in_progress'] ?? 0 }}</h5>
             <p>처리 중</p>
         </div>
         <div class="stat-card">
@@ -476,13 +497,13 @@
                         <div class="complaint-actions" onclick="event.stopPropagation()">
                             @can('update', $complaint)
                             <button type="button" class="btn btn-outline-primary btn-sm" 
-                                    onclick="quickEdit({{ $complaint->id }})">
+                                    onclick="complaintManager.quickEdit({{ $complaint->id }})">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             @endcan
                             @can('delete', $complaint)
                             <button type="button" class="btn btn-outline-danger btn-sm" 
-                                    onclick="confirmDelete({{ $complaint->id }})">
+                                    onclick="complaintManager.confirmDelete({{ $complaint->id }})">
                                 <i class="bi bi-trash"></i>
                             </button>
                             @endcan
@@ -574,93 +595,32 @@
     </div>
 </div>
 @endsection
+
 @push('scripts')
+<!-- 공통 JavaScript 파일 -->
+<script src="{{ asset('js/common.js') }}"></script>
+<script src="{{ asset('js/complaints.js') }}"></script>
+
 <script>
-// 전역 변수
-let currentPage = 1;
-let isLoading = false;
-let hasMoreData = true;
-let realTimeUpdateInterval;
-let selectedComplaints = new Set();
-let currentFilters = {};
+// 전역 ComplaintListManager 인스턴스
+let complaintManager;
 
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
-    initializeFilters();
-    initializeRealTimeUpdate();
-    initializeInfiniteScroll();
-    initializeBulkActions();
-    initializeQuickEdit();
+    // ComplaintListManager 초기화
+    complaintManager = new ComplaintListManager({
+        container: '#complaintsContainer',
+        perPage: 20,
+        realTimeUpdate: true,
+        realTimeInterval: 30000, // 30초
+        infiniteScroll: true
+    });
+    
+    // 추가 이벤트 리스너 설정
     initializeEventListeners();
 });
 
-// 필터 초기화
-function initializeFilters() {
-    // 현재 필터 상태 저장
-    updateCurrentFilters();
-    
-    // 필터 태그 표시
-    updateFilterTags();
-    
-    // 필터 변경 이벤트 리스너
-    document.getElementById('searchInput').addEventListener('input', debounce(applyFilters, 300));
-    document.getElementById('statusFilter').addEventListener('change', applyFilters);
-    document.getElementById('priorityFilter').addEventListener('change', applyFilters);
-    document.getElementById('sortFilter').addEventListener('change', applyFilters);
-    document.getElementById('categoryFilter').addEventListener('change', applyFilters);
-    document.getElementById('assignedFilter').addEventListener('change', applyFilters);
-    document.getElementById('dateFromFilter').addEventListener('change', applyFilters);
-    document.getElementById('dateToFilter').addEventListener('change', applyFilters);
-}
-
-// 실시간 업데이트 초기화
-function initializeRealTimeUpdate() {
-    realTimeUpdateInterval = setInterval(function() {
-        updateComplaintsList(true);
-    }, 30000); // 30초마다 업데이트
-}
-
-// 무한스크롤 초기화
-function initializeInfiniteScroll() {
-    window.addEventListener('scroll', function() {
-        if (isLoading || !hasMoreData) return;
-        
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const windowHeight = window.innerHeight;
-        const documentHeight = document.documentElement.scrollHeight;
-        
-        if (scrollTop + windowHeight >= documentHeight - 1000) {
-            loadMoreComplaints();
-        }
-    });
-}
-
-// 대량 작업 초기화
-function initializeBulkActions() {
-    // 전체 선택 체크박스
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('complaint-checkbox')) {
-            const complaintId = e.target.value;
-            if (e.target.checked) {
-                selectedComplaints.add(complaintId);
-            } else {
-                selectedComplaints.delete(complaintId);
-            }
-            updateBulkActions();
-        }
-    });
-    
-    // 대량 작업 적용
-    document.getElementById('applyBulkAction').addEventListener('click', applyBulkAction);
-    document.getElementById('clearSelection').addEventListener('click', clearSelection);
-}
-
-// 빠른 수정 초기화
-function initializeQuickEdit() {
-    document.getElementById('saveQuickEdit').addEventListener('click', saveQuickEdit);
-}
-
-// 이벤트 리스너 초기화
+// 추가 이벤트 리스너 초기화
 function initializeEventListeners() {
     // 새로고침 버튼
     document.getElementById('refreshBtn').addEventListener('click', function() {
@@ -683,444 +643,30 @@ function initializeEventListeners() {
     // 필터 초기화
     document.getElementById('clearFilters').addEventListener('click', function() {
         document.getElementById('filterForm').reset();
-        currentFilters = {};
-        updateFilterTags();
-        applyFilters();
+        complaintManager.currentFilters = {};
+        complaintManager.updateFilterTags();
+        complaintManager.applyFilters();
     });
-}
-
-// 현재 필터 상태 업데이트
-function updateCurrentFilters() {
-    const form = document.getElementById('filterForm');
-    const formData = new FormData(form);
     
-    currentFilters = {};
-    for (let [key, value] of formData.entries()) {
-        if (value.trim() !== '') {
-            currentFilters[key] = value;
-        }
-    }
-}
-
-// 필터 태그 업데이트
-function updateFilterTags() {
-    const filterTagsContainer = document.getElementById('filterTags');
-    filterTagsContainer.innerHTML = '';
-    
-    const filterLabels = {
-        search: '검색',
-        status: '상태',
-        priority: '우선순위',
-        sort: '정렬',
-        category_id: '카테고리',
-        assigned_to: '담당자',
-        date_from: '시작일',
-        date_to: '종료일'
-    };
-    
-    for (let [key, value] of Object.entries(currentFilters)) {
-        const tag = document.createElement('div');
-        tag.className = 'filter-tag';
-        tag.innerHTML = `
-            ${filterLabels[key] || key}: ${value}
-            <span class="remove-filter" onclick="removeFilter('${key}')">&times;</span>
-        `;
-        filterTagsContainer.appendChild(tag);
-    }
-}
-
-// 필터 제거
-function removeFilter(filterKey) {
-    const element = document.querySelector(`[name="${filterKey}"]`);
-    if (element) {
-        element.value = '';
-        delete currentFilters[filterKey];
-        updateFilterTags();
-        applyFilters();
-    }
-}
-
-// 필터 적용
-function applyFilters() {
-    updateCurrentFilters();
-    updateFilterTags();
-    currentPage = 1;
-    hasMoreData = true;
-    updateComplaintsList(false);
-}
-
-// 민원 목록 업데이트
-function updateComplaintsList(isRealTimeUpdate = false) {
-    if (isLoading) return;
-    
-    isLoading = true;
-    
-    if (isRealTimeUpdate) {
-        document.getElementById('realTimeIndicator').style.display = 'block';
-        document.getElementById('realTimeIndicator').classList.add('updating');
-    } else {
-        document.getElementById('loadingSpinner').style.display = 'block';
-    }
-    
-    // API 호출
-    const params = new URLSearchParams(currentFilters);
-    params.append('page', currentPage);
-    params.append('per_page', 20);
-    
-    fetch(`/api/complaints?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            if (currentPage === 1) {
-                document.getElementById('complaintsContainer').innerHTML = '';
-            }
-            
-            appendComplaints(data.data.data);
-            updateStats(data.data.meta);
-            
-            if (data.data.data.length < 20) {
-                hasMoreData = false;
-                document.getElementById('noMoreData').style.display = 'block';
-            }
-            
-            if (isRealTimeUpdate) {
-                showNotification('민원 목록이 업데이트되었습니다.', 'success');
-            }
-        } else {
-            showNotification('민원 목록을 불러오는데 실패했습니다.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
-    })
-    .finally(() => {
-        isLoading = false;
-        document.getElementById('loadingSpinner').style.display = 'none';
-        
-        if (isRealTimeUpdate) {
-            setTimeout(() => {
-                document.getElementById('realTimeIndicator').style.display = 'none';
-                document.getElementById('realTimeIndicator').classList.remove('updating');
-            }, 2000);
-        }
+    // 대량 작업 버튼들
+    document.getElementById('applyBulkAction').addEventListener('click', function() {
+        complaintManager.applyBulkAction();
     });
-}
-
-// 더 많은 민원 로드
-function loadMoreComplaints() {
-    if (isLoading || !hasMoreData) return;
     
-    currentPage++;
-    updateComplaintsList(false);
-}
-
-// 민원 추가
-function appendComplaints(complaints) {
-    const container = document.getElementById('complaintsContainer');
-    
-    complaints.forEach(complaint => {
-        const complaintHTML = createComplaintHTML(complaint);
-        container.insertAdjacentHTML('beforeend', complaintHTML);
+    document.getElementById('clearSelection').addEventListener('click', function() {
+        complaintManager.clearSelection();
     });
-}
-
-// 민원 HTML 생성
-function createComplaintHTML(complaint) {
-    const statusBadgeClass = {
-        'pending': 'bg-warning text-dark',
-        'in_progress': 'bg-info',
-        'resolved': 'bg-success',
-        'closed': 'bg-secondary'
-    };
     
-    const priorityBadgeClass = {
-        'urgent': 'bg-danger',
-        'high': 'bg-warning text-dark',
-        'normal': 'bg-success',
-        'low': 'bg-secondary'
-    };
-    
-    return `
-        <div class="col-12 mb-3 complaint-item" data-id="${complaint.id}">
-            <div class="card complaint-card ${complaint.priority}" onclick="window.location='/complaints/${complaint.id}'">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="d-flex align-items-center">
-                            <input type="checkbox" class="checkbox-custom complaint-checkbox me-2" 
-                                   value="${complaint.id}" onclick="event.stopPropagation()">
-                            <div>
-                                <h6 class="card-title mb-1">${complaint.title}</h6>
-                                <p class="text-muted mb-0 small">
-                                    ${complaint.category.name} · 
-                                    ${complaint.complainant.name} · 
-                                    ${new Date(complaint.created_at).toLocaleDateString('ko-KR')}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="d-flex flex-column align-items-end">
-                            <span class="status-badge badge ${statusBadgeClass[complaint.status] || 'bg-secondary'}">
-                                ${complaint.status_text}
-                            </span>
-                            <span class="priority-badge badge ${priorityBadgeClass[complaint.priority] || 'bg-secondary'} mt-1">
-                                ${complaint.priority_text}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <p class="card-text text-truncate mb-2">${complaint.content}</p>
-                    
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center text-muted small">
-                            ${complaint.attachments_count > 0 ? `<i class="bi bi-paperclip me-1"></i><span class="me-2">${complaint.attachments_count}</span>` : ''}
-                            ${complaint.comments_count > 0 ? `<i class="bi bi-chat-dots me-1"></i><span class="me-2">${complaint.comments_count}</span>` : ''}
-                            ${complaint.assigned_to ? `<i class="bi bi-person-check me-1"></i><span>${complaint.assigned_to.name}</span>` : ''}
-                        </div>
-                        
-                        <div class="complaint-actions" onclick="event.stopPropagation()">
-                            <button type="button" class="btn btn-outline-primary btn-sm" 
-                                    onclick="quickEdit(${complaint.id})">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger btn-sm" 
-                                    onclick="confirmDelete(${complaint.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-// 통계 업데이트
-function updateStats(meta) {
-    if (meta.statistics) {
-        document.getElementById('statTotal').textContent = meta.statistics.total || 0;
-        document.getElementById('statPending').textContent = meta.statistics.pending || 0;
-        document.getElementById('statInProgress').textContent = meta.statistics.in_progress || 0;
-        document.getElementById('statResolved').textContent = meta.statistics.resolved || 0;
-        document.getElementById('statUrgent').textContent = meta.statistics.urgent || 0;
-        document.getElementById('totalCount').textContent = meta.statistics.total || 0;
-    }
-}
-
-// 대량 작업 UI 업데이트
-function updateBulkActions() {
-    const count = selectedComplaints.size;
-    const bulkActions = document.getElementById('bulkActions');
-    const selectedCount = document.getElementById('selectedCount');
-    
-    selectedCount.textContent = count;
-    
-    if (count > 0) {
-        bulkActions.classList.add('show');
-    } else {
-        bulkActions.classList.remove('show');
-    }
-}
-
-// 대량 작업 적용
-function applyBulkAction() {
-    const status = document.getElementById('bulkStatusSelect').value;
-    const assignedTo = document.getElementById('bulkAssignSelect').value;
-    
-    if (!status && !assignedTo) {
-        showNotification('변경할 상태 또는 담당자를 선택해주세요.', 'warning');
-        return;
-    }
-    
-    if (selectedComplaints.size === 0) {
-        showNotification('선택된 민원이 없습니다.', 'warning');
-        return;
-    }
-    
-    if (!confirm(`선택된 ${selectedComplaints.size}개의 민원을 수정하시겠습니까?`)) {
-        return;
-    }
-    
-    const data = {
-        complaint_ids: Array.from(selectedComplaints),
-        status: status,
-        assigned_to: assignedTo
-    };
-    
-    fetch('/api/complaints/bulk-update', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('대량 작업이 완료되었습니다.', 'success');
-            clearSelection();
-            updateComplaintsList(false);
-        } else {
-            showNotification('대량 작업에 실패했습니다.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
+    // 빠른 수정 저장
+    document.getElementById('saveQuickEdit').addEventListener('click', function() {
+        complaintManager.saveQuickEdit();
     });
-}
-
-// 선택 해제
-function clearSelection() {
-    selectedComplaints.clear();
-    document.querySelectorAll('.complaint-checkbox').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    updateBulkActions();
-}
-
-// 빠른 수정
-function quickEdit(complaintId) {
-    // 민원 정보 가져오기
-    fetch(`/api/complaints/${complaintId}`, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const complaint = data.data;
-            document.getElementById('quickEditId').value = complaint.id;
-            document.getElementById('quickEditStatus').value = complaint.status;
-            document.getElementById('quickEditPriority').value = complaint.priority;
-            document.getElementById('quickEditAssigned').value = complaint.assigned_to || '';
-            
-            new bootstrap.Modal(document.getElementById('quickEditModal')).show();
-        } else {
-            showNotification('민원 정보를 불러오는데 실패했습니다.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
-    });
-}
-
-// 빠른 수정 저장
-function saveQuickEdit() {
-    const complaintId = document.getElementById('quickEditId').value;
-    const status = document.getElementById('quickEditStatus').value;
-    const priority = document.getElementById('quickEditPriority').value;
-    const assignedTo = document.getElementById('quickEditAssigned').value;
-    
-    const data = {
-        status: status,
-        priority: priority,
-        assigned_to: assignedTo || null
-    };
-    
-    fetch(`/api/complaints/${complaintId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('민원이 수정되었습니다.', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('quickEditModal')).hide();
-            updateComplaintsList(false);
-        } else {
-            showNotification('민원 수정에 실패했습니다.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
-    });
-}
-
-// 삭제 확인
-function confirmDelete(complaintId) {
-    if (!confirm('정말로 이 민원을 삭제하시겠습니까?')) {
-        return;
-    }
-    
-    fetch(`/api/complaints/${complaintId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('민원이 삭제되었습니다.', 'success');
-            document.querySelector(`[data-id="${complaintId}"]`).remove();
-            updateComplaintsList(false);
-        } else {
-            showNotification('민원 삭제에 실패했습니다.', 'error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('네트워크 오류가 발생했습니다.', 'error');
-    });
-}
-
-// 알림 표시
-function showNotification(message, type = 'info') {
-    // 간단한 알림 표시 (나중에 Toast로 개선 가능)
-    const alertClass = type === 'success' ? 'alert-success' : 
-                      type === 'error' ? 'alert-danger' : 
-                      type === 'warning' ? 'alert-warning' : 'alert-info';
-    
-    const alertHTML = `
-        <div class="alert ${alertClass} alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1050; min-width: 300px;">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', alertHTML);
-    
-    // 5초 후 자동 제거
-    setTimeout(() => {
-        const alert = document.querySelector('.alert');
-        if (alert) {
-            alert.remove();
-        }
-    }, 5000);
-}
-
-// 디바운스 함수
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
 }
 
 // 페이지 종료 시 정리
 window.addEventListener('beforeunload', function() {
-    if (realTimeUpdateInterval) {
-        clearInterval(realTimeUpdateInterval);
+    if (complaintManager) {
+        complaintManager.destroy();
     }
 });
 </script>
