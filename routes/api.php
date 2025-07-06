@@ -152,6 +152,30 @@ Route::prefix('v1')->group(function () {
             Route::get('/statistics', [\App\Http\Controllers\Api\CommentController::class, 'getStatistics']);
         });
         
+        // 알림 관리 라우트
+        Route::prefix('notifications')->group(function () {
+            // 알림 목록 조회
+            Route::get('/', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+            
+            // 읽지 않은 알림 개수
+            Route::get('/unread-count', [\App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+            
+            // 특정 알림 조회
+            Route::get('/{notification}', [\App\Http\Controllers\Api\NotificationController::class, 'show']);
+            
+            // 알림 읽음 처리
+            Route::put('/{notification}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+            Route::put('/read-all', [\App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+            
+            // 알림 삭제
+            Route::delete('/{notification}', [\App\Http\Controllers\Api\NotificationController::class, 'destroy']);
+            Route::delete('/clear-read', [\App\Http\Controllers\Api\NotificationController::class, 'clearRead']);
+            
+            // 알림 설정
+            Route::get('/settings', [\App\Http\Controllers\Api\NotificationController::class, 'settings']);
+            Route::put('/settings', [\App\Http\Controllers\Api\NotificationController::class, 'updateSettings']);
+        });
+        
         // 카테고리 관리 라우트
         Route::prefix('categories')->group(function () {
             // 기본 CRUD 라우트

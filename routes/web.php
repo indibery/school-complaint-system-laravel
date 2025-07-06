@@ -36,6 +36,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/complaints/search', [App\Http\Controllers\Web\ComplaintController::class, 'search'])->name('complaints.search');
     Route::get('/complaints/statistics', [App\Http\Controllers\Web\ComplaintController::class, 'statistics'])->name('complaints.statistics');
     
+    // 알림 관리
+    Route::get('/notifications', [App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/unread', [App\Http\Controllers\NotificationController::class, 'unread'])->name('notifications.unread');
+    Route::post('/notifications/{notification}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/read-all', [App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::delete('/notifications/{notification}', [App\Http\Controllers\NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::delete('/notifications/clear-read', [App\Http\Controllers\NotificationController::class, 'clearRead'])->name('notifications.clear-read');
+    
     // 사용자 관리 (관리자만)
     Route::middleware(['role:admin'])->group(function () {
         Route::resource('users', App\Http\Controllers\Web\UserController::class);
@@ -91,6 +99,11 @@ Route::prefix('api')->middleware('auth')->group(function () {
     
     // 부서 API
     Route::get('/departments', [App\Http\Controllers\Api\DepartmentController::class, 'index']);
+    
+    // 알림 API
+    Route::get('/notifications/unread', [App\Http\Controllers\NotificationController::class, 'unread']);
+    Route::post('/notifications/{notification}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
 });
 
 // 외부 API 라우트 (토큰 기반 인증)
