@@ -188,7 +188,6 @@ class Complaint extends Model
 
         return $result;
     }
-}
     
     /**
      * 상태 텍스트 가져오기
@@ -321,3 +320,4 @@ class Complaint extends Model
     {
         return !is_null($this->satisfaction_rating);
     }
+}

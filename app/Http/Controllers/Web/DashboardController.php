@@ -30,7 +30,7 @@ class DashboardController extends Controller
             $myComplaints = $this->getMyComplaints($user);
         }
         
-        return view('dashboard.index', compact('stats', 'recentComplaints', 'myComplaints'));
+        return view('dashboard', compact('stats', 'recentComplaints', 'myComplaints'));
     }
     
     /**
@@ -42,11 +42,11 @@ class DashboardController extends Controller
         
         // 사용자 역할에 따른 필터링
         if ($user->hasRole('parent')) {
-            $query->where('created_by', $user->id);
+            $query->where('user_id', $user->id);
         } elseif ($user->hasRole(['teacher', 'staff']) && !$user->hasRole(['admin', 'department_head'])) {
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
-                  ->orWhere('created_by', $user->id);
+                  ->orWhere('user_id', $user->id);
             });
         }
         
@@ -54,15 +54,18 @@ class DashboardController extends Controller
         $thisWeek = Carbon::now()->startOfWeek();
         $thisMonth = Carbon::now()->startOfMonth();
         
+        // 쿼리 복사본 생성
+        $baseQuery = clone $query;
+        
         return [
-            'total' => $query->count(),
-            'pending' => $query->where('status', 'pending')->count(),
-            'in_progress' => $query->where('status', 'in_progress')->count(),
-            'resolved' => $query->where('status', 'resolved')->count(),
-            'urgent' => $query->where('priority', 'urgent')->count(),
-            'today' => $query->whereDate('created_at', $today)->count(),
-            'this_week' => $query->where('created_at', '>=', $thisWeek)->count(),
-            'this_month' => $query->where('created_at', '>=', $thisMonth)->count(),
+            'total' => (clone $baseQuery)->count(),
+            'pending' => (clone $baseQuery)->where('status', 'pending')->count(),
+            'in_progress' => (clone $baseQuery)->where('status', 'in_progress')->count(),
+            'resolved' => (clone $baseQuery)->where('status', 'resolved')->count(),
+            'urgent' => (clone $baseQuery)->where('priority', 'urgent')->count(),
+            'today' => (clone $baseQuery)->whereDate('created_at', $today)->count(),
+            'this_week' => (clone $baseQuery)->where('created_at', '>=', $thisWeek)->count(),
+            'this_month' => (clone $baseQuery)->where('created_at', '>=', $thisMonth)->count(),
         ];
     }
     
@@ -76,11 +79,11 @@ class DashboardController extends Controller
         
         // 사용자 역할에 따른 필터링
         if ($user->hasRole('parent')) {
-            $query->where('created_by', $user->id);
+            $query->where('user_id', $user->id);
         } elseif ($user->hasRole(['teacher', 'staff']) && !$user->hasRole(['admin', 'department_head'])) {
             $query->where(function($q) use ($user) {
                 $q->where('assigned_to', $user->id)
-                  ->orWhere('created_by', $user->id);
+                  ->orWhere('user_id', $user->id);
             });
         }
         
