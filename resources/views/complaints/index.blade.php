@@ -1,22 +1,25 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('민원 관리') }}
-            </h2>
-            @can('create', App\Models\Complaint::class)
-            <a href="{{ route('complaints.create') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                새 민원 등록
-            </a>
-            @endcan
-        </div>
-    </x-slot>
+@extends('layouts.app')
 
+@section('content')
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <!-- 페이지 헤더 -->
+            <div class="mb-6">
+                <div class="flex justify-between items-center">
+                    <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                        {{ __('민원 관리') }}
+                    </h2>
+                    @can('create', App\Models\Complaint::class)
+                    <a href="{{ url('/admin-panel/issues/create') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        새 민원 등록
+                    </a>
+                    @endcan
+                </div>
+            </div>
+
             <!-- 통계 카드 -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
@@ -48,7 +51,7 @@
             <!-- 검색 및 필터 -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
-                    <form method="GET" action="{{ route('complaints.index') }}" class="space-y-4">
+                    <form method="GET" action="{{ url('/admin-panel/issues') }}" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">검색</label>
@@ -93,12 +96,12 @@
                                 <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     검색
                                 </button>
-                                <a href="{{ route('complaints.index') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
+                                <a href="{{ url('/admin-panel/issues') }}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150">
                                     초기화
                                 </a>
                             </div>
                             @can('export', App\Models\Complaint::class)
-                            <a href="{{ route('complaints.export', request()->all()) }}" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            <a href="{{ url('/reports/export?' . http_build_query(request()->all())) }}" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-500 active:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
@@ -151,7 +154,7 @@
                                         {{ $complaint->complaint_number }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <a href="{{ route('complaints.show', $complaint) }}" class="text-indigo-600 hover:text-indigo-900">
+                                        <a href="{{ url('/admin-panel/issues/' . $complaint->id) }}" class="text-indigo-600 hover:text-indigo-900">
                                             {{ Str::limit($complaint->title, 50) }}
                                         </a>
                                         @if($complaint->attachments_count > 0)
@@ -195,11 +198,11 @@
                                         {{ $complaint->created_at->format('Y-m-d') }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <a href="{{ route('complaints.show', $complaint) }}" class="text-indigo-600 hover:text-indigo-900">
+                                        <a href="{{ url('/admin-panel/issues/' . $complaint->id) }}" class="text-indigo-600 hover:text-indigo-900">
                                             보기
                                         </a>
                                         @can('update', $complaint)
-                                        <a href="{{ route('complaints.edit', $complaint) }}" class="text-indigo-600 hover:text-indigo-900 ml-3">
+                                        <a href="{{ url('/admin-panel/issues/' . $complaint->id . '/edit') }}" class="text-indigo-600 hover:text-indigo-900 ml-3">
                                             수정
                                         </a>
                                         @endcan
@@ -223,7 +226,7 @@
                         <p class="mt-1 text-sm text-gray-500">새로운 민원을 등록해보세요.</p>
                         @can('create', App\Models\Complaint::class)
                         <div class="mt-6">
-                            <a href="{{ route('complaints.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            <a href="{{ url('/admin-panel/issues/create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 새 민원 등록
                             </a>
                         </div>
@@ -234,4 +237,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+@endsection

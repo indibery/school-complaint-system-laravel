@@ -4,246 +4,261 @@
 
 @push('styles')
 <style>
-    .notification-list {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-    }
-    
     .notification-item {
-        padding: 1rem;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        align-items: start;
-        gap: 1rem;
-        transition: background-color 0.15s ease-in-out;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
         cursor: pointer;
     }
     
     .notification-item:hover {
-        background-color: #f9fafb;
-    }
-    
-    .notification-item:last-child {
-        border-bottom: none;
+        border-color: #007bff;
+        transform: translateY(-2px);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
     
     .notification-item.unread {
-        background-color: #eff6ff;
+        background-color: #f8f9ff;
+        border-left: 4px solid #007bff;
     }
     
-    .notification-icon {
-        flex-shrink: 0;
-        width: 2.5rem;
-        height: 2.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 0.5rem;
-        background-color: #f3f4f6;
+    .notification-item.read {
+        background-color: #f8f9fa;
+        opacity: 0.8;
     }
     
-    .notification-icon i {
-        font-size: 1.25rem;
+    .notification-type {
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 5px;
     }
     
-    .notification-content {
-        flex: 1;
-        min-width: 0;
+    .notification-type.complaint_created {
+        color: #28a745;
+    }
+    
+    .notification-type.complaint_assigned {
+        color: #007bff;
+    }
+    
+    .notification-type.complaint_status_changed {
+        color: #ffc107;
+    }
+    
+    .notification-type.complaint_resolved {
+        color: #17a2b8;
+    }
+    
+    .notification-type.complaint_comment_added {
+        color: #6f42c1;
     }
     
     .notification-title {
+        font-size: 1.1rem;
         font-weight: 600;
-        color: #111827;
-        margin-bottom: 0.25rem;
+        margin-bottom: 5px;
     }
     
     .notification-message {
-        font-size: 0.875rem;
-        color: #4b5563;
-        margin-bottom: 0.25rem;
+        color: #6c757d;
+        margin-bottom: 10px;
     }
     
     .notification-time {
-        font-size: 0.75rem;
-        color: #6b7280;
+        font-size: 0.85rem;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
     
     .notification-actions {
         display: flex;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
+        gap: 10px;
+        margin-top: 10px;
     }
     
-    .notification-actions button {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
+    .stats-card {
+        background: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .stats-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #007bff;
+    }
+    
+    .stats-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    
+    .filter-section {
+        background: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .empty-state {
         text-align: center;
-        padding: 4rem 2rem;
-        color: #6b7280;
+        padding: 50px;
+        color: #6c757d;
     }
     
     .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-        opacity: 0.5;
-    }
-    
-    .toolbar {
-        padding: 1rem;
-        background: #f9fafb;
-        border-bottom: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .filter-tabs {
-        display: flex;
-        gap: 1rem;
-    }
-    
-    .filter-tab {
-        padding: 0.5rem 1rem;
-        border-radius: 0.375rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #6b7280;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        transition: all 0.15s ease-in-out;
-    }
-    
-    .filter-tab.active {
-        color: #1d4ed8;
-        background: white;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    }
-    
-    .unread-dot {
-        width: 0.5rem;
-        height: 0.5rem;
-        background-color: #3b82f6;
-        border-radius: 9999px;
-        flex-shrink: 0;
-        margin-right: 0.5rem;
+        font-size: 4rem;
+        margin-bottom: 20px;
     }
 </style>
 @endpush
 
 @section('content')
-<div class="py-12">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="mb-6">
-            <h1 class="text-2xl font-semibold text-gray-900">알림</h1>
-            <p class="mt-2 text-sm text-gray-600">시스템에서 발생한 알림을 확인하세요.</p>
+<div class="container-fluid">
+    <!-- 페이지 헤더 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">알림</h1>
+            <p class="text-muted mb-0">받은 알림을 확인하고 관리합니다</p>
         </div>
-        
-        <div class="notification-list">
-            <div class="toolbar">
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-filter="all">
-                        전체
-                        @if($notifications->total() > 0)
-                        <span class="text-gray-500">({{ $notifications->total() }})</span>
-                        @endif
-                    </button>
-                    <button class="filter-tab" data-filter="unread">
-                        읽지 않음
-                        @if(Auth::user()->unreadNotifications()->count() > 0)
-                        <span class="text-blue-600">({{ Auth::user()->unreadNotifications()->count() }})</span>
-                        @endif
-                    </button>
-                    <button class="filter-tab" data-filter="read">
-                        읽음
-                        @if(Auth::user()->readNotifications()->count() > 0)
-                        <span class="text-gray-500">({{ Auth::user()->readNotifications()->count() }})</span>
-                        @endif
-                    </button>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="markAllAsRead()">
+                <i class="bi bi-check-all"></i> 모두 읽음 처리
+            </button>
+            <button class="btn btn-outline-danger" onclick="clearReadNotifications()">
+                <i class="bi bi-trash"></i> 읽은 알림 삭제
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 통계 카드 -->
+        <div class="col-md-3 mb-4">
+            <div class="stats-card">
+                <div class="stats-number">{{ $stats['total'] }}</div>
+                <div class="stats-label">총 알림</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="stats-card">
+                <div class="stats-number text-primary">{{ $stats['unread'] }}</div>
+                <div class="stats-label">읽지 않음</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="stats-card">
+                <div class="stats-number text-success">{{ $stats['read'] }}</div>
+                <div class="stats-label">읽음</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="stats-card">
+                <div class="stats-number text-warning">{{ $stats['by_type']['complaint_created'] ?? 0 }}</div>
+                <div class="stats-label">민원 생성</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 필터 섹션 -->
+    <div class="filter-section">
+        <form method="GET" action="{{ route('notifications.index') }}">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">읽음 상태</label>
+                    <select class="form-select" name="read_status">
+                        <option value="">전체</option>
+                        <option value="unread" {{ request('read_status') === 'unread' ? 'selected' : '' }}>읽지 않음</option>
+                        <option value="read" {{ request('read_status') === 'read' ? 'selected' : '' }}>읽음</option>
+                    </select>
                 </div>
-                
-                <div class="actions">
-                    @if(Auth::user()->unreadNotifications()->count() > 0)
-                    <button type="button" class="text-sm text-blue-600 hover:text-blue-800" onclick="markAllAsRead()">
-                        모두 읽음 표시
+                <div class="col-md-3">
+                    <label class="form-label">알림 타입</label>
+                    <select class="form-select" name="type">
+                        <option value="">전체</option>
+                        <option value="complaint_created" {{ request('type') === 'complaint_created' ? 'selected' : '' }}>민원 생성</option>
+                        <option value="complaint_assigned" {{ request('type') === 'complaint_assigned' ? 'selected' : '' }}>민원 할당</option>
+                        <option value="complaint_status_changed" {{ request('type') === 'complaint_status_changed' ? 'selected' : '' }}>상태 변경</option>
+                        <option value="complaint_resolved" {{ request('type') === 'complaint_resolved' ? 'selected' : '' }}>민원 해결</option>
+                        <option value="complaint_comment_added" {{ request('type') === 'complaint_comment_added' ? 'selected' : '' }}>댓글 추가</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">시작일</label>
+                    <input type="date" class="form-control" name="date_from" value="{{ request('date_from') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">종료일</label>
+                    <input type="date" class="form-control" name="date_to" value="{{ request('date_to') }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> 필터 적용
                     </button>
-                    @endif
-                    
-                    @if(Auth::user()->readNotifications()->count() > 0)
-                    <button type="button" class="text-sm text-red-600 hover:text-red-800 ml-3" onclick="clearReadNotifications()">
-                        읽은 알림 삭제
-                    </button>
-                    @endif
                 </div>
             </div>
-            
-            <div id="notificationsList">
-                @forelse($notifications as $notification)
-                <div class="notification-item {{ !$notification->read_at ? 'unread' : '' }}" 
-                     data-id="{{ $notification->id }}"
-                     data-url="{{ $notification->data['url'] ?? '#' }}"
-                     onclick="handleNotificationClick('{{ $notification->id }}', '{{ $notification->data['url'] ?? '#' }}')">
-                    
-                    @if(!$notification->read_at)
-                    <span class="unread-dot"></span>
-                    @endif
-                    
-                    <div class="notification-icon">
-                        @php
-                            $icons = [
-                                'complaint_created' => 'bi-file-earmark-plus text-blue-600',
-                                'complaint_assigned' => 'bi-person-check text-purple-600',
-                                'complaint_commented' => 'bi-chat-dots text-green-600',
-                                'complaint_status_changed' => 'bi-arrow-repeat text-orange-600',
-                                'complaint_deadline' => 'bi-clock-history text-red-600'
-                            ];
-                            $iconClass = $icons[$notification->data['type'] ?? 'default'] ?? 'bi-bell text-gray-600';
-                        @endphp
-                        <i class="bi {{ $iconClass }}"></i>
+        </form>
+    </div>
+
+    <!-- 알림 목록 -->
+    <div class="row">
+        <div class="col-12">
+            @if($notifications->count() > 0)
+                @foreach($notifications as $notification)
+                <div class="notification-item {{ $notification->read_at ? 'read' : 'unread' }}" 
+                     onclick="handleNotificationClick({{ $notification->id }}, '{{ $notification->action_url }}')">
+                    <div class="notification-type {{ $notification->type }}">
+                        {{ $notification->type }}
                     </div>
-                    
-                    <div class="notification-content">
-                        <div class="notification-title">
-                            {{ $notification->data['title'] ?? '알림' }}
-                        </div>
-                        <div class="notification-message">
-                            {{ $notification->data['message'] ?? '' }}
-                        </div>
-                        <div class="notification-time">
-                            {{ $notification->created_at->diffForHumans() }}
-                        </div>
+                    <div class="notification-title">
+                        {{ $notification->title }}
                     </div>
-                    
-                    <div class="notification-actions" onclick="event.stopPropagation()">
+                    <div class="notification-message">
+                        {{ $notification->message }}
+                    </div>
+                    <div class="notification-time">
+                        <i class="bi bi-clock"></i>
+                        {{ $notification->created_at->diffForHumans() }}
                         @if(!$notification->read_at)
-                        <button type="button" class="btn btn-sm btn-outline-primary" 
-                                onclick="markAsRead('{{ $notification->id }}')">
-                            읽음
-                        </button>
+                            <span class="badge bg-primary ms-2">새로운 알림</span>
                         @endif
-                        <button type="button" class="btn btn-sm btn-outline-danger" 
-                                onclick="deleteNotification('{{ $notification->id }}')">
-                            삭제
+                    </div>
+                    <div class="notification-actions">
+                        @if(!$notification->read_at)
+                            <button class="btn btn-sm btn-outline-primary" onclick="markAsRead({{ $notification->id }}, event)">
+                                <i class="bi bi-check"></i> 읽음 처리
+                            </button>
+                        @endif
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteNotification({{ $notification->id }}, event)">
+                            <i class="bi bi-trash"></i> 삭제
                         </button>
+                        @if($notification->action_url)
+                            <a href="{{ $notification->action_url }}" class="btn btn-sm btn-primary" onclick="event.stopPropagation()">
+                                <i class="bi bi-arrow-right"></i> 바로가기
+                            </a>
+                        @endif
                     </div>
                 </div>
-                @empty
+                @endforeach
+
+                <!-- 페이지네이션 -->
+                <div class="d-flex justify-content-center mt-4">
+                    {{ $notifications->links() }}
+                </div>
+            @else
                 <div class="empty-state">
                     <i class="bi bi-bell-slash"></i>
-                    <h4 class="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h4>
-                    <p class="text-sm text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
+                    <h4>알림이 없습니다</h4>
+                    <p>새로운 알림이 오면 여기에 표시됩니다.</p>
                 </div>
-                @endforelse
-            </div>
-            
-            @if($notifications->hasPages())
-            <div class="p-4 border-t border-gray-200">
-                {{ $notifications->links() }}
-            </div>
             @endif
         </div>
     </div>
@@ -251,193 +266,151 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/common.js') }}"></script>
 <script>
-// 필터 탭 전환
-document.querySelectorAll('.filter-tab').forEach(tab => {
-    tab.addEventListener('click', function() {
-        // 활성 탭 변경
-        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-        this.classList.add('active');
-        
-        // 필터링 적용
-        const filter = this.dataset.filter;
-        filterNotifications(filter);
-    });
-});
-
-// 알림 필터링
-function filterNotifications(filter) {
-    const url = new URL(window.location);
-    
-    if (filter === 'unread') {
-        url.searchParams.set('filter', 'unread');
-    } else if (filter === 'read') {
-        url.searchParams.set('filter', 'read');
-    } else {
-        url.searchParams.delete('filter');
-    }
-    
-    window.location.href = url.toString();
-}
-
 // 알림 클릭 처리
-async function handleNotificationClick(notificationId, url) {
-    try {
-        // 읽지 않은 알림인 경우 읽음 처리
-        const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
-        if (notificationItem.classList.contains('unread')) {
-            await markAsRead(notificationId, false);
-        }
-        
-        // URL로 이동
-        if (url && url !== '#') {
-            window.location.href = url;
-        }
-    } catch (error) {
-        console.error('알림 클릭 처리 실패:', error);
-    }
-}
-
-// 알림 읽음 처리
-async function markAsRead(notificationId, showMessage = true) {
-    try {
-        const response = await fetch(`/notifications/${notificationId}/read`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken()
-            }
+function handleNotificationClick(notificationId, actionUrl) {
+    // 읽음 처리
+    if (actionUrl) {
+        markAsRead(notificationId, null, function() {
+            window.location.href = actionUrl;
         });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // UI 업데이트
-            const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
-            notificationItem.classList.remove('unread');
-            notificationItem.querySelector('.unread-dot')?.remove();
-            
-            // 읽음 버튼 제거
-            const readBtn = notificationItem.querySelector('button[onclick*="markAsRead"]');
-            if (readBtn) {
-                readBtn.remove();
-            }
-            
-            if (showMessage) {
-                showNotification('알림을 읽음으로 표시했습니다.', 'success');
-            }
-        }
-    } catch (error) {
-        showNotification('읽음 처리에 실패했습니다.', 'error');
+    } else {
+        markAsRead(notificationId);
     }
 }
 
-// 모든 알림 읽음 처리
-async function markAllAsRead() {
+// 알림을 읽음으로 표시
+function markAsRead(notificationId, event = null, callback = null) {
+    if (event) {
+        event.stopPropagation();
+    }
+
+    fetch(`/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 알림 상태 업데이트
+            const notificationElement = document.querySelector(`[onclick*="${notificationId}"]`);
+            if (notificationElement) {
+                notificationElement.classList.remove('unread');
+                notificationElement.classList.add('read');
+                
+                // 새로운 알림 뱃지 제거
+                const badge = notificationElement.querySelector('.badge');
+                if (badge) {
+                    badge.remove();
+                }
+                
+                // 읽음 처리 버튼 제거
+                const readButton = notificationElement.querySelector('.btn-outline-primary');
+                if (readButton) {
+                    readButton.remove();
+                }
+            }
+            
+            if (callback) {
+                callback();
+            }
+        } else {
+            alert('알림 처리 중 오류가 발생했습니다.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('네트워크 오류가 발생했습니다.');
+    });
+}
+
+// 모든 알림을 읽음으로 표시
+function markAllAsRead() {
     if (!confirm('모든 알림을 읽음으로 표시하시겠습니까?')) {
         return;
     }
-    
-    try {
-        const response = await fetch('/notifications/read-all', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken()
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showNotification('모든 알림을 읽음으로 표시했습니다.', 'success');
-            setTimeout(() => location.reload(), 1000);
+
+    fetch('/notifications/read-all', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json'
         }
-    } catch (error) {
-        showNotification('읽음 처리에 실패했습니다.', 'error');
-    }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('처리 중 오류가 발생했습니다.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('네트워크 오류가 발생했습니다.');
+    });
 }
 
 // 알림 삭제
-async function deleteNotification(notificationId) {
+function deleteNotification(notificationId, event) {
+    event.stopPropagation();
+    
     if (!confirm('이 알림을 삭제하시겠습니까?')) {
         return;
     }
-    
-    try {
-        const response = await fetch(`/notifications/${notificationId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken()
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // UI에서 제거
-            const notificationItem = document.querySelector(`[data-id="${notificationId}"]`);
-            notificationItem.remove();
-            
-            showNotification('알림이 삭제되었습니다.', 'success');
-            
-            // 알림이 모두 삭제된 경우 빈 상태 표시
-            if (document.querySelectorAll('.notification-item').length === 0) {
-                document.getElementById('notificationsList').innerHTML = `
-                    <div class="empty-state">
-                        <i class="bi bi-bell-slash"></i>
-                        <h4 class="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h4>
-                        <p class="text-sm text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
-                    </div>
-                `;
-            }
+
+    fetch(`/notifications/${notificationId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json'
         }
-    } catch (error) {
-        showNotification('알림 삭제에 실패했습니다.', 'error');
-    }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const notificationElement = document.querySelector(`[onclick*="${notificationId}"]`);
+            if (notificationElement) {
+                notificationElement.remove();
+            }
+        } else {
+            alert('삭제 중 오류가 발생했습니다.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('네트워크 오류가 발생했습니다.');
+    });
 }
 
 // 읽은 알림 모두 삭제
-async function clearReadNotifications() {
+function clearReadNotifications() {
     if (!confirm('읽은 알림을 모두 삭제하시겠습니까?')) {
         return;
     }
-    
-    try {
-        const response = await fetch('/notifications/clear-read', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken()
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showNotification('읽은 알림이 모두 삭제되었습니다.', 'success');
-            setTimeout(() => location.reload(), 1000);
-        }
-    } catch (error) {
-        showNotification('알림 삭제에 실패했습니다.', 'error');
-    }
-}
 
-// URL 파라미터 확인하여 필터 적용
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const filter = urlParams.get('filter');
-    
-    if (filter) {
-        document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.classList.remove('active');
-            if (tab.dataset.filter === filter) {
-                tab.classList.add('active');
-            }
-        });
-    }
-});
+    fetch('/notifications/clear-read', {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            'Accept': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('처리 중 오류가 발생했습니다.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('네트워크 오류가 발생했습니다.');
+    });
+}
 </script>
 @endpush

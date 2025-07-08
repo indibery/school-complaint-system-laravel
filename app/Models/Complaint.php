@@ -15,6 +15,7 @@ class Complaint extends Model
         'user_id',
         'student_id', 
         'category_id',
+        'department_id',
         'title',
         'content',
         'status',
@@ -71,6 +72,14 @@ class Complaint extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * 부서
+     */
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     /**

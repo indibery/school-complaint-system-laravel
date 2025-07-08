@@ -11,6 +11,38 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// 민원 목록 직접 라우트 (임시)
+Route::get('/complaints', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    // complaints.index가 아닌 admin-panel/issues로 직접 리다이렉트
+    return redirect('/admin-panel/issues');
+})->middleware('web');
+
+// 민원 목록 웹 페이지 (Herd 리라이트 회피)
+Route::get('/web-complaints', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    return app(\App\Http\Controllers\Web\ComplaintController::class)->index(request());
+})->middleware(['web', 'auth', 'verified', 'force.web'])->name('web.complaints');
+
+// 테스트 라우트
+Route::get('/test-web', function () {
+    return view('welcome');
+});
+
+Route::get('/test-json', function () {
+    return response()->json(['message' => 'This is JSON response']);
+});
+
+// 강제 HTML 응답 테스트
+Route::get('/force-html', function () {
+    return response('<h1>웹 페이지가 정상 작동합니다!</h1><p>이 페이지가 보인다면 웹 컴트롤러가 작동하고 있습니다.</p>')
+        ->header('Content-Type', 'text/html');
+});
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -22,23 +54,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 대시보드
     Route::get('/dashboard', [App\Http\Controllers\Web\DashboardController::class, 'index'])->name('dashboard');
     
-    // 민원 관리
-    Route::resource('complaints', App\Http\Controllers\Web\ComplaintController::class);
+    // 테스트 - 민원 목록 직접 호출
+    Route::get('/test-complaints', function () {
+        return '민원 목록 페이지 테스트';
+    });
     
-    // 민원 추가 기능
-    Route::post('/complaints/{complaint}/comments', [App\Http\Controllers\Web\ComplaintController::class, 'storeComment'])->name('complaints.comments.store');
-    Route::delete('/comments/{comment}', [App\Http\Controllers\Web\ComplaintController::class, 'destroyComment'])->name('comments.destroy');
-    Route::post('/complaints/{complaint}/attachments', [App\Http\Controllers\Web\ComplaintController::class, 'uploadAttachment'])->name('complaints.attachments.upload');
-    Route::get('/attachments/{attachment}/download', [App\Http\Controllers\Web\ComplaintController::class, 'downloadAttachment'])->name('attachments.download');
-    Route::delete('/attachments/{attachment}', [App\Http\Controllers\Web\ComplaintController::class, 'deleteAttachment'])->name('attachments.delete');
-    Route::get('/complaints/{complaint}/attachments/{attachment}/download', [App\Http\Controllers\Web\ComplaintController::class, 'downloadAttachment'])->name('complaints.download-attachment');
-    Route::post('/complaints/bulk-update', [App\Http\Controllers\Web\ComplaintController::class, 'bulkUpdate'])->name('complaints.bulk-update');
-    Route::get('/complaints/export', [App\Http\Controllers\Web\ComplaintController::class, 'export'])->name('complaints.export');
-    Route::put('/complaints/{complaint}/status', [App\Http\Controllers\Web\ComplaintController::class, 'updateStatus'])->name('complaints.update-status');
-    Route::put('/complaints/{complaint}/assign', [App\Http\Controllers\Web\ComplaintController::class, 'assignUser'])->name('complaints.assign-user');
-    Route::put('/complaints/{complaint}/priority', [App\Http\Controllers\Web\ComplaintController::class, 'updatePriority'])->name('complaints.update-priority');
-    Route::get('/complaints/search', [App\Http\Controllers\Web\ComplaintController::class, 'search'])->name('complaints.search');
-    Route::get('/complaints/statistics', [App\Http\Controllers\Web\ComplaintController::class, 'statistics'])->name('complaints.statistics');
+    // 웹 민원 시스템 (웹서버 리라이트 완전 회피)
+    Route::prefix('admin-panel')->name('web.complaints.')->group(function () {
+        Route::get('/issues', [App\Http\Controllers\Web\ComplaintController::class, 'index'])->name('index');
+        Route::get('/issues/create', [App\Http\Controllers\Web\ComplaintController::class, 'create'])->name('create');
+        Route::post('/issues', [App\Http\Controllers\Web\ComplaintController::class, 'store'])->name('store');
+        Route::get('/issues/{complaint}', [App\Http\Controllers\Web\ComplaintController::class, 'show'])->name('show');
+        Route::get('/issues/{complaint}/edit', [App\Http\Controllers\Web\ComplaintController::class, 'edit'])->name('edit');
+        Route::put('/issues/{complaint}', [App\Http\Controllers\Web\ComplaintController::class, 'update'])->name('update');
+        Route::delete('/issues/{complaint}', [App\Http\Controllers\Web\ComplaintController::class, 'destroy'])->name('destroy');
+        
+        // 민원 추가 기능
+        Route::post('/issues/{complaint}/comments', [App\Http\Controllers\Web\ComplaintController::class, 'storeComment'])->name('comments.store');
+        Route::post('/issues/{complaint}/attachments', [App\Http\Controllers\Web\ComplaintController::class, 'uploadAttachment'])->name('attachments.upload');
+        Route::get('/issues/{complaint}/attachments/{attachment}/download', [App\Http\Controllers\Web\ComplaintController::class, 'downloadAttachment'])->name('download-attachment');
+        Route::delete('/issues/{complaint}/attachments/{attachment}', [App\Http\Controllers\Web\ComplaintController::class, 'deleteAttachment'])->name('delete-attachment');
+        Route::put('/issues/{complaint}/status', [App\Http\Controllers\Web\ComplaintController::class, 'updateStatus'])->name('update-status');
+        Route::put('/issues/{complaint}/assign', [App\Http\Controllers\Web\ComplaintController::class, 'assignUser'])->name('assign-user');
+        Route::put('/issues/{complaint}/priority', [App\Http\Controllers\Web\ComplaintController::class, 'updatePriority'])->name('update-priority');
+        Route::get('/issues/{complaint}/assignable-users', [App\Http\Controllers\Web\ComplaintController::class, 'getAssignableUsers'])->name('assignable-users');
+        Route::get('/issues/{complaint}/status-transitions', [App\Http\Controllers\Web\ComplaintController::class, 'getStatusTransitions'])->name('status-transitions');
+    });
     
     // 알림 관리
     Route::get('/notifications', [App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
@@ -65,21 +106,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // API 라우트 (내부 웹 애플리케이션용)
-Route::prefix('api')->middleware('auth')->group(function () {
+Route::prefix('api')->middleware('auth')->name('api.')->group(function () {
     // 민원 API
-    Route::get('/complaints', [App\Http\Controllers\Api\ComplaintController::class, 'index']);
-    Route::get('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'show']);
-    Route::post('/complaints', [App\Http\Controllers\Api\ComplaintController::class, 'store']);
-    Route::put('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'update']);
-    Route::delete('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'destroy']);
+    Route::get('/complaints', [App\Http\Controllers\Api\ComplaintController::class, 'index'])->name('complaints.index');
+    Route::get('/complaints/my-complaints', [App\Http\Controllers\Api\ComplaintController::class, 'myComplaints'])->name('complaints.my-complaints');
+    Route::get('/complaints/assigned-to-me', [App\Http\Controllers\Api\ComplaintController::class, 'assignedToMe'])->name('complaints.assigned-to-me');
+    Route::get('/complaints/statistics', [App\Http\Controllers\Api\ComplaintController::class, 'statistics'])->name('complaints.statistics');
+    Route::get('/complaints/export-statistics', [App\Http\Controllers\Api\ComplaintController::class, 'exportStatistics'])->name('complaints.export-statistics');
+    Route::get('/complaints/download-export/{file}', [App\Http\Controllers\Api\ComplaintController::class, 'downloadExport'])->name('complaints.download-export');
+    Route::get('/complaints/status-options', [App\Http\Controllers\Api\ComplaintController::class, 'getStatusOptions'])->name('complaints.status-options');
+    Route::get('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'show'])->name('complaints.show');
+    Route::post('/complaints', [App\Http\Controllers\Api\ComplaintController::class, 'store'])->name('complaints.store');
+    Route::put('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'update'])->name('complaints.update');
+    Route::delete('/complaints/{complaint}', [App\Http\Controllers\Api\ComplaintController::class, 'destroy'])->name('complaints.destroy');
     
-    // 대량 업데이트
-    Route::post('/complaints/bulk-update', [App\Http\Controllers\Api\ComplaintController::class, 'bulkUpdate']);
+    // 민원 상태 및 할당 관리
+    Route::put('/complaints/{complaint}/status', [App\Http\Controllers\Api\ComplaintController::class, 'updateStatus'])->name('complaints.update-status');
+    Route::put('/complaints/{complaint}/assign', [App\Http\Controllers\Api\ComplaintController::class, 'assign'])->name('complaints.assign');
+    Route::get('/complaints/{complaint}/assignable-users', [App\Http\Controllers\Api\ComplaintController::class, 'getAssignableUsers'])->name('complaints.assignable-users');
+    Route::get('/complaints/{complaint}/status-transitions', [App\Http\Controllers\Api\ComplaintController::class, 'getStatusTransitions'])->name('complaints.status-transitions');
     
-    // 상태 관리
-    Route::put('/complaints/{complaint}/status', [App\Http\Controllers\Api\ComplaintController::class, 'updateStatus']);
-    Route::put('/complaints/{complaint}/assign', [App\Http\Controllers\Api\ComplaintController::class, 'assignUser']);
-    Route::put('/complaints/{complaint}/priority', [App\Http\Controllers\Api\ComplaintController::class, 'updatePriority']);
+    // 민원 첨부파일
+    Route::post('/complaints/{complaint}/attachments', [App\Http\Controllers\Api\ComplaintController::class, 'uploadAttachments'])->name('complaints.upload-attachments');
+    Route::delete('/complaints/{complaint}/attachments', [App\Http\Controllers\Api\ComplaintController::class, 'deleteAttachments'])->name('complaints.delete-attachments');
+    Route::get('/complaints/{complaint}/attachments/{attachment}/download', [App\Http\Controllers\Api\ComplaintController::class, 'downloadAttachment'])->name('complaints.download-attachment');
     
     // 댓글 API
     Route::get('/complaints/{complaint}/comments', [App\Http\Controllers\Api\CommentController::class, 'index']);
@@ -114,10 +164,13 @@ Route::prefix('api')->middleware('auth')->group(function () {
 Route::prefix('api/v1')->middleware('auth:sanctum')->group(function () {
     // 민원 API
     Route::apiResource('complaints', App\Http\Controllers\Api\ComplaintController::class);
-    Route::post('/complaints/bulk-update', [App\Http\Controllers\Api\ComplaintController::class, 'bulkUpdate']);
+    Route::get('/complaints/my-complaints', [App\Http\Controllers\Api\ComplaintController::class, 'myComplaints']);
+    Route::get('/complaints/assigned-to-me', [App\Http\Controllers\Api\ComplaintController::class, 'assignedToMe']);
     Route::put('/complaints/{complaint}/status', [App\Http\Controllers\Api\ComplaintController::class, 'updateStatus']);
-    Route::put('/complaints/{complaint}/assign', [App\Http\Controllers\Api\ComplaintController::class, 'assignUser']);
-    Route::put('/complaints/{complaint}/priority', [App\Http\Controllers\Api\ComplaintController::class, 'updatePriority']);
+    Route::put('/complaints/{complaint}/assign', [App\Http\Controllers\Api\ComplaintController::class, 'assign']);
+    Route::get('/complaints/{complaint}/assignable-users', [App\Http\Controllers\Api\ComplaintController::class, 'getAssignableUsers']);
+    Route::get('/complaints/statistics', [App\Http\Controllers\Api\ComplaintController::class, 'statistics']);
+    Route::get('/complaints/export-statistics', [App\Http\Controllers\Api\ComplaintController::class, 'exportStatistics']);
     
     // 댓글 API
     Route::apiResource('comments', App\Http\Controllers\Api\CommentController::class);

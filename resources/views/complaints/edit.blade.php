@@ -419,10 +419,10 @@
             <div class="mb-3">
                 <label for="description" class="form-label required">상세 내용</label>
                 <textarea class="form-control @error('description') is-invalid @enderror" 
-                          id="description" name="description" rows="8" 
+                          id="content" name="content" rows="8" 
                           placeholder="민원 내용을 자세히 작성해주세요" required>{{ old('description', $complaint->description) }}</textarea>
                 <div class="char-counter">
-                    <span id="descriptionCharCount">0</span> / 5000
+                    <span id="contentCharCount">0</span> / 5000
                 </div>
                 <div class="form-helper">
                     <i class="bi bi-info-circle"></i> 
@@ -589,12 +589,12 @@ function initializeForm() {
     });
 
     descriptionInput.addEventListener('input', function() {
-        document.getElementById('descriptionCharCount').textContent = this.value.length;
+        document.getElementById('contentCharCount').textContent = this.value.length;
     });
 
     // 초기 카운트 설정
     document.getElementById('titleCharCount').textContent = titleInput.value.length;
-    document.getElementById('descriptionCharCount').textContent = descriptionInput.value.length;
+    document.getElementById('contentCharCount').textContent = descriptionInput.value.length;
 }
 
 // 파일 업로드 초기화

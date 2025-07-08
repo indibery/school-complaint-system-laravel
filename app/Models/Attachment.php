@@ -246,7 +246,7 @@ class Attachment extends Model
             return false;
         }
     }
-}
+
     /**
      * 파일 크기를 사람이 읽기 쉬운 형태로 변환
      */
@@ -363,3 +363,4 @@ class Attachment extends Model
             }
         });
     }
+}

@@ -57,7 +57,7 @@ class ComplaintResource extends JsonResource
             'comments_count' => $this->whenCounted('comments'),
             'attachments' => AttachmentResource::collection($this->whenLoaded('attachments')),
             'comments' => CommentResource::collection($this->whenLoaded('comments')),
-            'status_history' => StatusHistoryResource::collection($this->whenLoaded('statusHistory')),
+            'status_history' => StatusHistoryResource::collection($this->whenLoaded('statusLogs')),
             'metadata' => $this->metadata,
             'created_at' => $this->created_at->toDateTimeString(),
             'updated_at' => $this->updated_at->toDateTimeString(),

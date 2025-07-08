@@ -21,9 +21,11 @@ class Student extends Model
         'student_id',
         'name',
         'grade',
+        'class',
         'class_number',
         'student_number',
         'gender',
+        'parent_id',
         'is_active',
     ];
 
@@ -51,40 +53,19 @@ class Student extends Model
     ];
 
     /**
-     * 담임교사 (학년/반 정보로 찾기)
+     * 부모 관계
      */
-    public function homeroomTeacher()
+    public function parent(): BelongsTo
     {
-        return User::where('grade', $this->grade)
-                   ->where('class_number', $this->class_number)
-                   ->where('role', 'teacher')
-                   ->first();
+        return $this->belongsTo(User::class, 'parent_id');
     }
 
     /**
-     * 학부모들 (다대다 관계)
-     */
-    public function parents(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'parent_student_relationships', 'student_id', 'parent_id')
-            ->withPivot(['relationship_type', 'is_primary'])
-            ->withTimestamps();
-    }
-
-    /**
-     * 주 학부모 (대표 학부모)
-     */
-    public function primaryParent(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'primary_parent_id');
-    }
-
-    /**
-     * 학생과 관련된 민원들 (학부모가 제기한 민원)
+     * 학생과 관련된 민원들
      */
     public function complaints(): HasMany
     {
-        return $this->hasMany(Complaint::class, 'related_student_id');
+        return $this->hasMany(Complaint::class, 'student_id');
     }
 
     /**
@@ -100,7 +81,7 @@ class Student extends Model
      */
     public function getFullNameAttribute(): string
     {
-        return "{$this->grade}학년 {$this->class_number}반 {$this->student_number}번 {$this->name}";
+        return "{$this->grade}학년 {$this->class}반 {$this->student_number}번 {$this->name}";
     }
 
     /**
@@ -108,7 +89,7 @@ class Student extends Model
      */
     public function getClassInfoAttribute(): string
     {
-        return "{$this->grade}학년 {$this->class_number}반";
+        return "{$this->grade}학년 {$this->class}반";
     }
 
     /**
@@ -132,15 +113,7 @@ class Student extends Model
      */
     public function scopeByClass($query, $grade, $classNumber)
     {
-        return $query->where('grade', $grade)->where('class_number', $classNumber);
-    }
-
-    /**
-     * 담임교사별 스코프 (학년/반으로 찾기)
-     */
-    public function scopeByHomeroom($query, $grade, $classNumber)
-    {
-        return $query->where('grade', $grade)->where('class_number', $classNumber);
+        return $query->where('grade', $grade)->where('class', $classNumber);
     }
 
     /**
@@ -150,41 +123,7 @@ class Student extends Model
     {
         return $query->where(function($q) use ($keyword) {
             $q->where('name', 'like', "%{$keyword}%")
-              ->orWhere('student_id', 'like', "%{$keyword}%");
+              ->orWhere('student_number', 'like', "%{$keyword}%");
         });
-    }
-
-    /**
-     * 학생 생성 시 유효성 검증 규칙
-     */
-    public static function getValidationRules($isUpdate = false): array
-    {
-        return [
-            'student_id' => 'required|string|max:20|unique:students,student_id',
-            'name' => 'required|string|max:255|regex:/^[가-힣a-zA-Z\s]+$/',
-            'grade' => 'required|integer|min:1|max:6',
-            'class_number' => 'required|integer|min:1|max:20',
-            'student_number' => 'required|integer|min:1|max:50',
-            'gender' => 'required|in:male,female',
-        ];
-    }
-
-    /**
-     * 학생 생성 시 유효성 검증 메시지
-     */
-    public static function getValidationMessages(): array
-    {
-        return [
-            'student_id.required' => '학번은 필수입니다.',
-            'student_id.unique' => '이미 사용 중인 학번입니다.',
-            'name.required' => '학생 이름은 필수입니다.',
-            'name.regex' => '이름은 한글, 영문, 공백만 입력 가능합니다.',
-            'grade.required' => '학년은 필수입니다.',
-            'grade.min' => '학년은 1 이상이어야 합니다.',
-            'grade.max' => '학년은 6 이하여야 합니다.',
-            'class_number.required' => '반은 필수입니다.',
-            'student_number.required' => '번호는 필수입니다.',
-            'gender.required' => '성별은 필수입니다.',
-        ];
     }
 }
