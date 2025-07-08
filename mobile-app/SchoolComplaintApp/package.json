@@ -1,0 +1,42 @@
+{
+  "name": "schoolcomplaintapp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "start-safe": "expo start --clear --port 8082",
+    "start-clean": "npm run clean && expo start --clear",
+    "clean": "rm -rf node_modules/.cache && rm -rf .expo && rm -rf dist",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "kill-ports": "lsof -ti :8081 | xargs kill -9 2>/dev/null || true && lsof -ti :8082 | xargs kill -9 2>/dev/null || true",
+    "test-auth": "echo '🧪 인증 시스템 테스트 시작' && npm run start-safe"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/bottom-tabs": "^7.4.2",
+    "@react-navigation/native": "^7.1.14",
+    "@react-navigation/stack": "^7.4.2",
+    "axios": "^1.10.0",
+    "expo": "~53.0.17",
+    "expo-document-picker": "^13.1.6",
+    "expo-image-picker": "^16.1.4",
+    "expo-location": "^18.1.6",
+    "expo-notifications": "^0.31.4",
+    "expo-status-bar": "~2.2.3",
+    "nativewind": "^2.0.11",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-paper": "^5.14.5",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-vector-icons": "^10.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "tailwindcss": "^4.1.11"
+  },
+  "private": true
+}

@@ -1,0 +1,115 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./App.{js,jsx,ts,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // 학교 민원 시스템 커스텀 색상
+        primary: {
+          50: '#e3f2fd',
+          100: '#bbdefb',
+          500: '#2196f3',
+          600: '#1976d2',
+          700: '#1565c0',
+          900: '#0d47a1',
+        },
+        secondary: {
+          50: '#e8f5e8',
+          100: '#c8e6c9',
+          500: '#4caf50',
+          600: '#43a047',
+          700: '#388e3c',
+          900: '#1b5e20',
+        },
+        accent: {
+          50: '#fff3e0',
+          100: '#ffe0b2',
+          500: '#ff9800',
+          600: '#f57c00',
+          700: '#ef6c00',
+          900: '#e65100',
+        },
+        danger: {
+          50: '#ffebee',
+          100: '#ffcdd2',
+          500: '#f44336',
+          600: '#e53935',
+          700: '#d32f2f',
+          900: '#b71c1c',
+        },
+        success: {
+          50: '#e8f5e8',
+          100: '#c8e6c9',
+          500: '#4caf50',
+          600: '#43a047',
+          700: '#388e3c',
+          900: '#1b5e20',
+        },
+        warning: {
+          50: '#fff8e1',
+          100: '#ffecb3',
+          500: '#ffc107',
+          600: '#ffb300',
+          700: '#ffa000',
+          900: '#ff6f00',
+        },
+        info: {
+          50: '#e1f5fe',
+          100: '#b3e5fc',
+          500: '#03a9f4',
+          600: '#039be5',
+          700: '#0288d1',
+          900: '#01579b',
+        },
+        // 다크 모드 색상
+        dark: {
+          50: '#f5f5f5',
+          100: '#eeeeee',
+          200: '#e0e0e0',
+          300: '#bdbdbd',
+          400: '#9e9e9e',
+          500: '#757575',
+          600: '#616161',
+          700: '#424242',
+          800: '#303030',
+          900: '#212121',
+        },
+      },
+      fontFamily: {
+        'sans': ['System', 'ui-sans-serif', 'system-ui'],
+        'serif': ['ui-serif', 'Georgia'],
+        'mono': ['ui-monospace', 'SFMono-Regular'],
+      },
+      fontSize: {
+        'xs': ['12px', '16px'],
+        'sm': ['14px', '20px'],
+        'base': ['16px', '24px'],
+        'lg': ['18px', '28px'],
+        'xl': ['20px', '28px'],
+        '2xl': ['24px', '32px'],
+        '3xl': ['30px', '36px'],
+        '4xl': ['36px', '40px'],
+        '5xl': ['48px', '1'],
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
+      borderRadius: {
+        'xl': '12px',
+        '2xl': '16px',
+        '3xl': '24px',
+      },
+      boxShadow: {
+        'soft': '0 2px 8px rgba(0, 0, 0, 0.1)',
+        'medium': '0 4px 16px rgba(0, 0, 0, 0.12)',
+        'strong': '0 8px 32px rgba(0, 0, 0, 0.16)',
+      },
+    },
+  },
+  plugins: [],
+}
