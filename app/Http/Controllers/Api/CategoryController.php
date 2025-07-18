@@ -14,6 +14,40 @@ use Illuminate\Support\Facades\DB;
 class CategoryController extends BaseApiController
 {
     /**
+     * Display public categories (no authentication required).
+     */
+    public function publicIndex(Request $request): JsonResponse
+    {
+        try {
+            $categories = Category::where('is_active', true)
+                ->orderBy('sort_order')
+                ->get()
+                ->map(function ($category) {
+                    return [
+                        'id' => $category->id,
+                        'name' => $category->name,
+                        'description' => $category->description,
+                        'parent_id' => $category->parent_id,
+                        'sort_order' => $category->sort_order,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => '공개 카테고리 목록을 조회했습니다.',
+                'data' => $categories
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '카테고리 목록 조회 중 오류가 발생했습니다.',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    /**
      * Display a listing of categories.
      */
     public function index(Request $request): JsonResponse

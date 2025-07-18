@@ -106,7 +106,7 @@ class ComplaintController extends Controller
      */
     public function store(Request $request)
     {
-        // $this->authorize('create', Complaint::class);
+        $this->authorize('create', Complaint::class);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -118,36 +118,33 @@ class ComplaintController extends Controller
         ]);
 
         try {
-            // 직접 민원 생성
-            $complaint = new Complaint();
-            $complaint->title = $validated['title'];
-            $complaint->content = $validated['content'];
-            $complaint->category_id = $validated['category_id'];
-            $complaint->priority = $validated['priority'];
-            $complaint->student_id = $validated['student_id'] ?? 1; // 임시로 1로 설정
-            $complaint->user_id = $request->user()->id;
-            $complaint->status = 'submitted';
-            $complaint->is_public = false; // 기본값으로 비공개
-            $complaint->save();
+            // 서비스 레이어를 사용하여 민원 생성
+            $complaint = $this->complaintService->create($validated, $request->user());
 
-            // 첨부파일 처리
+            // 첨부파일 처리 (서비스 레이어 사용)
             if ($request->hasFile('attachments')) {
-                foreach ($request->file('attachments') as $file) {
-                    // 간단한 파일 저장 로직
-                    $path = $file->store('complaints/' . $complaint->id, 'public');
-                    // 첨부파일 데이터베이스 연결은 나중에 처리
-                }
+                $this->fileService->uploadFiles(
+                    $complaint,
+                    $request->file('attachments'),
+                    $request->user()
+                );
             }
 
             return redirect()
-                ->route('dashboard')
+                ->route('web.complaints.index')
                 ->with('success', '민원이 성공적으로 접수되었습니다.');
 
         } catch (\Exception $e) {
-            Log::error('민원 생성 실패', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            Log::error('민원 생성 실패', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()->id,
+                'validated_data' => $validated
+            ]);
+            
             return back()
                 ->withInput()
-                ->with('error', '민원 접수 중 오류가 발생했습니다. (' . $e->getMessage() . ')');
+                ->with('error', '민원 접수 중 오류가 발생했습니다: ' . $e->getMessage());
         }
     }
 

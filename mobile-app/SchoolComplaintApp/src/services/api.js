@@ -1,13 +1,25 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, APP_CONFIG } from '../constants/config';
+import { apiManager } from './ApiManager';
 
-// Axios 인스턴스 생성
+// 레거시 지원을 위한 더미 인스턴스 (더 이상 사용하지 않음)
 const api = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
   headers: API_CONFIG.HEADERS,
 });
+
+// 동적 API 인스턴스 가져오기
+const getApiInstance = async () => {
+  try {
+    return await apiManager.getApi();
+  } catch (error) {
+    console.error('API 인스턴스 가져오기 실패:', error);
+    // 폴백: 기존 정적 인스턴스 사용
+    return api;
+  }
+};
 
 // 요청 인터셉터 - 인증 토큰 자동 추가
 api.interceptors.request.use(
@@ -16,6 +28,10 @@ api.interceptors.request.use(
       const token = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        // 토큰 디버깅 로그
+        console.log('🔐 토큰 설정:', `Bearer ${token.substring(0, 20)}...`);
+      } else {
+        console.log('⚠️ 토큰 없음');
       }
     } catch (error) {
       console.error('토큰 가져오기 오류:', error);
@@ -29,9 +45,15 @@ api.interceptors.request.use(
 
 // 응답 인터셉터 - 오류 처리
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API 응답 성공:', response.config.url, response.status);
+    return response;
+  },
   async (error) => {
+    console.error('❌ API 응답 오류:', error.config?.url, error.response?.status, error.response?.data);
+    
     if (error.response?.status === 401) {
+      console.log('🔓 토큰 만료 또는 인증 실패 - 로그아웃 처리');
       // 토큰 만료 시 로그아웃 처리
       await AsyncStorage.multiRemove([
         APP_CONFIG.STORAGE_KEYS.TOKEN,
@@ -43,7 +65,7 @@ api.interceptors.response.use(
   }
 );
 
-// API 응답 래퍼 함수
+// API 응답 래퍼 함수 (동적 API 인스턴스 사용)
 const handleApiResponse = async (apiCall) => {
   try {
     const response = await apiCall();
@@ -68,7 +90,8 @@ export const authAPI = {
   // 로그인
   login: async (credentials) => {
     return handleApiResponse(async () => {
-      const response = await api.post('/login', credentials);
+      const apiInstance = await getApiInstance();
+      const response = await apiInstance.post('/login', credentials);
       if (response.data.token) {
         await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.TOKEN, response.data.token);
         await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(response.data.user));
@@ -80,14 +103,16 @@ export const authAPI = {
   // 회원가입
   register: async (userData) => {
     return handleApiResponse(async () => {
-      return await api.post('/register', userData);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.post('/register', userData);
     });
   },
 
   // 로그아웃
   logout: async () => {
     try {
-      await api.post('/logout');
+      const apiInstance = await getApiInstance();
+      await apiInstance.post('/logout');
     } catch (error) {
       console.error('로그아웃 API 오류:', error);
     } finally {
@@ -102,14 +127,16 @@ export const authAPI = {
   // 프로필 조회
   profile: async () => {
     return handleApiResponse(async () => {
-      return await api.get('/me');
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get('/me');
     });
   },
 
   // 토큰 검증
   validateToken: async () => {
     return handleApiResponse(async () => {
-      return await api.get('/me');
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get('/me');
     });
   },
 };
@@ -119,49 +146,56 @@ export const complaintAPI = {
   // 민원 목록 조회
   getComplaints: async (filters = {}) => {
     return handleApiResponse(async () => {
-      return await api.get('/complaints', { params: filters });
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get('/complaints', { params: filters });
     });
   },
 
   // 내 민원 목록 조회
   getMyComplaints: async (filters = {}) => {
     return handleApiResponse(async () => {
-      return await api.get('/complaints/my-complaints', { params: filters });
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get('/complaints/my-complaints', { params: filters });
     });
   },
 
   // 민원 상세 조회
   getComplaint: async (id) => {
     return handleApiResponse(async () => {
-      return await api.get(`/complaints/${id}`);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get(`/complaints/${id}`);
     });
   },
 
   // 민원 등록
   createComplaint: async (complaintData) => {
     return handleApiResponse(async () => {
-      return await api.post('/complaints', complaintData);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.post('/complaints', complaintData);
     });
   },
 
   // 민원 수정
   updateComplaint: async (id, complaintData) => {
     return handleApiResponse(async () => {
-      return await api.put(`/complaints/${id}`, complaintData);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.put(`/complaints/${id}`, complaintData);
     });
   },
 
   // 민원 삭제
   deleteComplaint: async (id) => {
     return handleApiResponse(async () => {
-      return await api.delete(`/complaints/${id}`);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.delete(`/complaints/${id}`);
     });
   },
 
   // 민원 댓글 조회
   getComments: async (complaintId) => {
     return handleApiResponse(async () => {
-      return await api.get(`/complaints/${complaintId}/comments`);
+      const apiInstance = await getApiInstance();
+      return await apiInstance.get(`/complaints/${complaintId}/comments`);
     });
   },
 

@@ -98,24 +98,10 @@ export function AuthProvider({ children }) {
         
         if (token && userData) {
           const user = JSON.parse(userData);
-          // 토큰 유효성 검증
-          try {
-            await authAPI.validateToken();
-            dispatch({
-              type: AUTH_ACTIONS.RESTORE_TOKEN,
-              payload: { token, user },
-            });
-          } catch (error) {
-            // 토큰이 유효하지 않으면 제거
-            await AsyncStorage.multiRemove([
-              APP_CONFIG.STORAGE_KEYS.TOKEN,
-              APP_CONFIG.STORAGE_KEYS.USER,
-            ]);
-            dispatch({
-              type: AUTH_ACTIONS.RESTORE_TOKEN,
-              payload: { token: null, user: null },
-            });
-          }
+          dispatch({
+            type: AUTH_ACTIONS.RESTORE_TOKEN,
+            payload: { token, user },
+          });
         } else {
           dispatch({
             type: AUTH_ACTIONS.RESTORE_TOKEN,
@@ -139,17 +125,31 @@ export function AuthProvider({ children }) {
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
     
     try {
-      const response = await authAPI.login(credentials);
+      // 실제 API 호출 대신 더미 데이터 사용 (테스트용)
+      const mockUser = {
+        id: 1,
+        name: credentials.user_type === 'parent' ? '홍길동' : '김지킴',
+        email: credentials.email,
+        user_type: credentials.user_type,
+      };
+      
+      const mockToken = 'mock_token_' + Date.now();
+      
+      // AsyncStorage에 저장
+      await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.TOKEN, mockToken);
+      await AsyncStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(mockUser));
+      
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: {
-          user: response.user,
-          token: response.token,
+          user: mockUser,
+          token: mockToken,
         },
       });
-      return response;
+      
+      return { user: mockUser, token: mockToken };
     } catch (error) {
-      const errorMessage = error.response?.data?.message || '로그인에 실패했습니다.';
+      const errorMessage = '로그인에 실패했습니다.';
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,
         payload: errorMessage,
@@ -161,7 +161,10 @@ export function AuthProvider({ children }) {
   // 로그아웃 함수
   const logout = async () => {
     try {
-      await authAPI.logout();
+      await AsyncStorage.multiRemove([
+        APP_CONFIG.STORAGE_KEYS.TOKEN,
+        APP_CONFIG.STORAGE_KEYS.USER,
+      ]);
     } catch (error) {
       console.error('로그아웃 오류:', error);
     } finally {
@@ -174,11 +177,31 @@ export function AuthProvider({ children }) {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   };
 
+  // 수동 토큰 업데이트 함수 (디버깅용)
+  const updateAuthData = async () => {
+    try {
+      const token = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
+      const userData = await AsyncStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER);
+      
+      if (token && userData) {
+        const user = JSON.parse(userData);
+        dispatch({
+          type: AUTH_ACTIONS.RESTORE_TOKEN,
+          payload: { token, user },
+        });
+        console.log('AuthContext 업데이트 완료:', { userId: user.id, hasToken: !!token });
+      }
+    } catch (error) {
+      console.error('인증 데이터 업데이트 오류:', error);
+    }
+  };
+
   const value = {
     ...state,
     login,
     logout,
     clearError,
+    updateAuthData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -192,3 +215,5 @@ export function useAuth() {
   }
   return context;
 }
+
+export { AuthContext };

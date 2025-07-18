@@ -23,14 +23,15 @@ import {
   Divider,
   HelperText,
   Snackbar,
+  Badge,
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { AuthContext } from '../context/AuthContext';
-import { complaintService } from '../services/api';
 import { COMPLAINT_CATEGORIES, PRIORITY_LEVELS } from '../constants/categories';
+import { complaintAPI } from '../services/api';
 
 export default function CreateComplaintScreen({ navigation }) {
   const theme = useTheme();
@@ -42,23 +43,110 @@ export default function CreateComplaintScreen({ navigation }) {
     description: '',
     category: '',
     priority: 'medium',
-    location: '',
-    contact_info: user?.phone || '',
+    contact_info: '',
   });
   
   const [attachments, setAttachments] = useState([]);
-  const [selectedLocation, setSelectedLocation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showPriorityDialog, setShowPriorityDialog] = useState(false);
-  const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
+  // 디버깅 상태
+  const [isDebugging, setIsDebugging] = useState(false);
+  const [debugResults, setDebugResults] = useState(null);
+  const [networkStatus, setNetworkStatus] = useState('unknown');
+  
+  // 컴포넌트 마운트 시 네트워크 상태 확인
+  useEffect(() => {
+    checkNetworkStatus();
+  }, []);
+  
+  // 네트워크 상태 확인
+  const checkNetworkStatus = async () => {
+    try {
+      const results = await testNetworkConnection();
+      const publicApiWorking = results.some(r => r.name.includes('퍼블릭 API') && r.success);
+      const v1ApiWorking = results.some(r => r.name.includes('카테고리 API') && r.success);
+      
+      if (publicApiWorking && v1ApiWorking) {
+        setNetworkStatus('good');
+      } else if (publicApiWorking) {
+        setNetworkStatus('partial');
+      } else {
+        setNetworkStatus('poor');
+      }
+    } catch (error) {
+      setNetworkStatus('error');
+    }
+  };
+  
+  // 네트워크 진단 실행 (개선된 버전)
+  const runNetworkDiagnosis = async () => {
+    setIsDebugging(true);
+    try {
+      // 1. 기본 네트워크 진단
+      const diagnosis = await diagnoseNetworkIssues();
+      setDebugResults(diagnosis);
+      
+      // 2. 추가 API 테스트
+      const apiTests = await testAPIEndpoints();
+      
+      // 3. 종합 결과 분석
+      const allTests = [...diagnosis.tests, ...apiTests];
+      const successCount = allTests.filter(t => t.success).length;
+      const totalCount = allTests.length;
+      
+      // 4. 상세 결과 표시
+      let resultMessage = `성공: ${successCount}/${totalCount}\n\n`;
+      
+      // CSRF 관련 특별 체크
+      const csrfError = allTests.find(t => t.statusCode === 419);
+      if (csrfError) {
+        resultMessage += '🚨 CSRF 토큰 오류 발견!\n- 서버에서 API 라우트의 CSRF 보호 해제 필요\n\n';
+      }
+      
+      // 500 오류 체크
+      const serverError = allTests.find(t => t.status === 500);
+      if (serverError) {
+        resultMessage += '🔧 서버 내부 오류 발견!\n- 서버 로그 확인 필요\n\n';
+      }
+      
+      // 404 오류 체크
+      const notFoundError = allTests.find(t => t.status === 404);
+      if (notFoundError) {
+        resultMessage += '🔍 API 경로 오류 발견!\n- 라우트 설정 확인 필요\n\n';
+      }
+      
+      resultMessage += diagnosis.recommendations.join('\n');
+      
+      Alert.alert(
+        '네트워크 진단 결과',
+        resultMessage,
+        [
+          {
+            text: '상세 보기',
+            onPress: () => {
+              console.log('📊 상세 진단 결과:', { diagnosis, apiTests });
+              showSnackbar('콘솔에서 상세 결과를 확인하세요');
+            },
+          },
+          { text: '확인' },
+        ]
+      );
+      
+    } catch (error) {
+      Alert.alert('진단 오류', error.message);
+    } finally {
+      setIsDebugging(false);
+    }
+  };
+  
   // 사용자 타입별 카테고리 필터링
   const getAvailableCategories = () => {
-    if (user?.type === 'school_guard') {
+    if (user?.user_type === 'school_guard') {
       return COMPLAINT_CATEGORIES.filter(cat => 
         cat.userTypes.includes('school_guard')
       );
@@ -75,32 +163,26 @@ export default function CreateComplaintScreen({ navigation }) {
       academic: {
         title: '학사 관련 민원',
         description: '문제 상황:\n\n발생 일시:\n\n관련 과목/교사:\n\n요청 사항:\n\n',
-        contact_info: '학부모 연락처를 입력해주세요.',
       },
       life: {
         title: '학교생활 관련 민원',
         description: '문제 상황:\n\n발생 장소:\n\n관련 학생:\n\n목격자:\n\n요청 사항:\n\n',
-        contact_info: '학부모 연락처를 입력해주세요.',
       },
       safety: {
         title: '안전 관련 민원',
         description: '안전 문제:\n\n발생 위치:\n\n위험 정도:\n\n긴급성:\n\n요청 조치:\n\n',
-        contact_info: '즉시 연락 가능한 번호를 입력해주세요.',
       },
       facility: {
         title: '시설 관련 민원',
         description: '시설 문제:\n\n위치:\n\n손상 정도:\n\n사용 불가 여부:\n\n수리 요청:\n\n',
-        contact_info: '담당자 연락처를 입력해주세요.',
       },
       environment: {
         title: '환경 관련 민원',
         description: '환경 문제:\n\n발생 구역:\n\n문제 정도:\n\n개선 요청:\n\n',
-        contact_info: '담당자 연락처를 입력해주세요.',
       },
       other: {
         title: '기타 민원',
         description: '민원 내용을 자세히 작성해주세요:\n\n\n\n',
-        contact_info: '연락처를 입력해주세요.',
       },
     };
     
@@ -111,7 +193,6 @@ export default function CreateComplaintScreen({ navigation }) {
         category: category.id,
         title: template.title,
         description: template.description,
-        contact_info: template.contact_info,
       }));
       
       // 에러 초기화
@@ -122,7 +203,7 @@ export default function CreateComplaintScreen({ navigation }) {
     }
   };
   
-  // 이미지 선택
+  // 이미지 선택 (에러 수정)
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -132,7 +213,7 @@ export default function CreateComplaintScreen({ navigation }) {
       }
       
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'Images', // 간단한 방식으로 수정
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -156,7 +237,7 @@ export default function CreateComplaintScreen({ navigation }) {
     }
   };
   
-  // 카메라 촬영
+  // 카메라 촬영 (에러 수정)
   const takePicture = async () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -166,6 +247,7 @@ export default function CreateComplaintScreen({ navigation }) {
       }
       
       const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: 'Images', // 간단한 방식으로 수정
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -213,40 +295,6 @@ export default function CreateComplaintScreen({ navigation }) {
     }
   };
   
-  // 현재 위치 가져오기
-  const getCurrentLocation = async () => {
-    try {
-      setIsLocationLoading(true);
-      
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('권한 필요', '위치 정보를 가져오기 위해 위치 접근 권한이 필요합니다.');
-        return;
-      }
-      
-      const location = await Location.getCurrentPositionAsync({});
-      const address = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      
-      if (address[0]) {
-        const locationString = `${address[0].region || ''} ${address[0].city || ''} ${address[0].street || ''} ${address[0].name || ''}`.trim();
-        setFormData(prev => ({
-          ...prev,
-          location: locationString,
-        }));
-        setSelectedLocation(location.coords);
-        showSnackbar('현재 위치가 설정되었습니다.');
-      }
-    } catch (error) {
-      console.error('Location error:', error);
-      Alert.alert('오류', '위치 정보를 가져올 수 없습니다.');
-    } finally {
-      setIsLocationLoading(false);
-    }
-  };
-  
   // 첨부파일 삭제
   const removeAttachment = (id) => {
     setAttachments(prev => prev.filter(att => att.id !== id));
@@ -283,7 +331,7 @@ export default function CreateComplaintScreen({ navigation }) {
     return Object.keys(newErrors).length === 0;
   };
   
-  // 민원 제출
+  // 실제 API를 통한 민원 제출 (CSRF 우회 포함)
   const handleSubmit = async () => {
     if (!validateForm()) {
       Alert.alert('입력 오류', '필수 항목을 모두 입력해주세요.');
@@ -293,54 +341,40 @@ export default function CreateComplaintScreen({ navigation }) {
     try {
       setIsSubmitting(true);
       
-      // 민원 생성
-      const complaintData = {
-        ...formData,
+      // 민원 등록 API 호출
+      console.log('📤 민원 등록 API 호출 시작...', formData);
+      
+      const response = await complaintAPI.createComplaint({
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
         priority: formData.priority,
-        location: formData.location || null,
-        coordinates: selectedLocation ? {
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-        } : null,
-      };
+        contact_info: formData.contact_info,
+        attachments: attachments,
+      });
       
-      const response = await complaintService.createComplaint(complaintData);
+      console.log('📥 민원 등록 API 응답:', response);
       
-      if (response.success && response.data) {
-        const complaintId = response.data.id;
-        
-        // 첨부파일 업로드
-        if (attachments.length > 0) {
-          for (const attachment of attachments) {
-            try {
-              await complaintService.uploadAttachment(complaintId, attachment);
-            } catch (error) {
-              console.error('Attachment upload error:', error);
-              // 첨부파일 업로드 실패해도 민원 등록은 성공으로 처리
-            }
-          }
-        }
-        
+      if (response.success) {
         Alert.alert(
           '등록 완료',
           '민원이 성공적으로 등록되었습니다.',
           [
             {
               text: '확인',
-              onPress: () => {
-                navigation.goBack();
-                // 목록 화면 새로고침 트리거
-                navigation.navigate('ComplaintList', { refresh: Date.now() });
-              },
+              onPress: () => navigation.goBack(),
             },
           ]
         );
       } else {
-        throw new Error(response.message || '민원 등록에 실패했습니다.');
+        // API 실패 처리
+        const errorMessage = response.message || '민원 등록에 실패했습니다.';
+        Alert.alert('등록 실패', errorMessage);
       }
+      
     } catch (error) {
-      console.error('Submit error:', error);
-      Alert.alert('오류', error.message || '민원 등록 중 오류가 발생했습니다.');
+      console.error('❌ 민원 등록 오류:', error);
+      Alert.alert('네트워크 오류', `서버 연결에 실패했습니다.\n\n오류: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -360,6 +394,26 @@ export default function CreateComplaintScreen({ navigation }) {
     );
   };
   
+  // 네트워크 상태 색상
+  const getNetworkStatusColor = () => {
+    switch (networkStatus) {
+      case 'good': return theme.colors.primary;
+      case 'partial': return theme.colors.warning || '#FF9800';
+      case 'poor': return theme.colors.error;
+      default: return theme.colors.onSurfaceVariant;
+    }
+  };
+  
+  // 네트워크 상태 텍스트
+  const getNetworkStatusText = () => {
+    switch (networkStatus) {
+      case 'good': return '양호';
+      case 'partial': return '제한적';
+      case 'poor': return '불량';
+      default: return '확인중';
+    }
+  };
+  
   const availableCategories = getAvailableCategories();
   const selectedCategory = availableCategories.find(cat => cat.id === formData.category);
   const selectedPriority = PRIORITY_LEVELS.find(opt => opt.id === formData.priority);
@@ -377,13 +431,48 @@ export default function CreateComplaintScreen({ navigation }) {
         >
           {/* 헤더 */}
           <View style={styles.header}>
-            <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.primary }]}>
-              민원 등록
-            </Text>
+            <View style={styles.headerContent}>
+              <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.primary }]}>
+                민원 등록
+              </Text>
+              <View style={styles.networkStatus}>
+                <Badge 
+                  size={8} 
+                  style={{ backgroundColor: getNetworkStatusColor() }}
+                />
+                <Text 
+                  variant="bodySmall" 
+                  style={{ color: getNetworkStatusColor(), marginLeft: 6 }}
+                >
+                  네트워크: {getNetworkStatusText()}
+                </Text>
+              </View>
+            </View>
             <Text variant="bodyMedium" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
               자세한 내용을 입력해주세요
             </Text>
           </View>
+          
+          {/* 디버깅 버튼 */}
+          <Card style={[styles.section, { backgroundColor: theme.colors.secondaryContainer }]}>
+            <Card.Content>
+              <View style={styles.debugSection}>
+                <Text variant="bodyMedium" style={styles.debugTitle}>
+                  🔧 네트워크 진단
+                </Text>
+                <Button
+                  mode="outlined"
+                  onPress={runNetworkDiagnosis}
+                  loading={isDebugging}
+                  disabled={isDebugging}
+                  icon="network"
+                  style={styles.debugButton}
+                >
+                  {isDebugging ? '진단 중...' : '연결 상태 확인'}
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
           
           {/* 카테고리 선택 */}
           <Card style={styles.section}>
@@ -485,29 +574,6 @@ export default function CreateComplaintScreen({ navigation }) {
             </Card.Content>
           </Card>
           
-          {/* 위치 정보 */}
-          <Card style={styles.section}>
-            <Card.Content>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                위치 정보
-              </Text>
-              <TextInput
-                label="위치"
-                value={formData.location}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, location: text }))}
-                mode="outlined"
-                style={styles.textInput}
-                right={
-                  <TextInput.Icon
-                    icon="crosshairs-gps"
-                    onPress={getCurrentLocation}
-                    loading={isLocationLoading}
-                  />
-                }
-              />
-            </Card.Content>
-          </Card>
-          
           {/* 연락처 정보 */}
           <Card style={styles.section}>
             <Card.Content>
@@ -524,6 +590,7 @@ export default function CreateComplaintScreen({ navigation }) {
                 style={styles.textInput}
                 keyboardType="phone-pad"
                 error={!!errors.contact_info}
+                placeholder="예: 010-1234-5678"
               />
               {errors.contact_info && (
                 <HelperText type="error" visible={!!errors.contact_info}>
@@ -684,12 +751,32 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   title: {
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   subtitle: {
     opacity: 0.7,
+  },
+  networkStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  debugSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  debugTitle: {
+    fontWeight: 'bold',
+  },
+  debugButton: {
+    minWidth: 140,
   },
   section: {
     marginBottom: 16,

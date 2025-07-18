@@ -5,7 +5,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 import { View, Text, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { colors, tw } from '../utils/tailwind';
 
 // 화면 임포트
 import HomeScreen from '../screens/HomeScreen';
@@ -13,9 +12,38 @@ import ComplaintListScreen from '../screens/ComplaintListScreen';
 import ComplaintDetailScreen from '../screens/ComplaintDetailScreen';
 import CreateComplaintScreen from '../screens/CreateComplaintScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ApiSettingsScreen from '../screens/ApiSettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+// 색상 상수
+const colors = {
+  primary: {
+    50: '#e3f2fd',
+    100: '#bbdefb',
+    200: '#90caf9',
+    300: '#64b5f6',
+    400: '#42a5f5',
+    500: '#2196f3',
+    600: '#1e88e5',
+    700: '#1976d2',
+    800: '#1565c0',
+    900: '#0d47a1',
+  },
+  gray: {
+    50: '#fafafa',
+    100: '#f5f5f5',
+    200: '#eeeeee',
+    300: '#e0e0e0',
+    400: '#bdbdbd',
+    500: '#9e9e9e',
+    600: '#757575',
+    700: '#616161',
+    800: '#424242',
+    900: '#212121',
+  },
+};
 
 // 홈 스택 네비게이터
 function HomeStackNavigator() {
@@ -64,6 +92,17 @@ function HomeStackNavigator() {
         component={CreateComplaintScreen}
         options={{
           headerTitle: '민원 등록',
+          presentation: 'modal',
+          headerStyle: {
+            backgroundColor: theme.colors.surface,
+          },
+        }}
+      />
+      <Stack.Screen
+        name="ApiSettings"
+        component={ApiSettingsScreen}
+        options={{
+          headerTitle: 'API 설정',
           presentation: 'modal',
           headerStyle: {
             backgroundColor: theme.colors.surface,
@@ -192,14 +231,12 @@ function TabBarLabel({ focused, children }) {
 // 커스텀 탭 바 아이콘
 function TabBarIcon({ focused, iconName, size = 24 }) {
   return (
-    <View style={[
-      tw.itemsCenter,
-      tw.justifyCenter,
-      {
-        width: size + 8,
-        height: size + 8,
-      }
-    ]}>
+    <View style={{
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: size + 8,
+      height: size + 8,
+    }}>
       <MaterialIcons
         name={iconName}
         size={size}
@@ -207,16 +244,14 @@ function TabBarIcon({ focused, iconName, size = 24 }) {
       />
       {focused && (
         <View
-          style={[
-            tw.absolute,
-            tw.rounded('full'),
-            {
-              width: size + 16,
-              height: size + 16,
-              backgroundColor: colors.primary[50],
-              opacity: 0.3,
-            }
-          ]}
+          style={{
+            position: 'absolute',
+            width: size + 16,
+            height: size + 16,
+            backgroundColor: colors.primary[50],
+            opacity: 0.3,
+            borderRadius: 999,
+          }}
         />
       )}
     </View>
@@ -236,11 +271,11 @@ export default function MainTabNavigator() {
           let size = 24;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home';
+            iconName = 'home';
           } else if (route.name === 'Complaints') {
-            iconName = focused ? 'assignment' : 'assignment';
+            iconName = 'assignment';
           } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person';
+            iconName = 'person';
           }
 
           return <TabBarIcon focused={focused} iconName={iconName} size={size} />;
@@ -280,7 +315,7 @@ export default function MainTabNavigator() {
         component={HomeStackNavigator}
         options={{
           title: '홈',
-          tabBarBadge: undefined, // 추후 알림 개수 표시
+          tabBarBadge: undefined,
         }}
       />
       <Tab.Screen
@@ -288,7 +323,7 @@ export default function MainTabNavigator() {
         component={ComplaintStackNavigator}
         options={{
           title: '내 민원',
-          tabBarBadge: undefined, // 추후 처리 중인 민원 개수 표시
+          tabBarBadge: undefined,
         }}
       />
       <Tab.Screen
@@ -296,7 +331,7 @@ export default function MainTabNavigator() {
         component={ProfileStackNavigator}
         options={{
           title: '프로필',
-          tabBarBadge: undefined, // 추후 중요 알림 표시
+          tabBarBadge: undefined,
         }}
       />
     </Tab.Navigator>

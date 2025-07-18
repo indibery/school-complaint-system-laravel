@@ -17,6 +17,9 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('role')->default('parent'); // 역할 (parent, teacher, admin, super_admin)
+            $table->string('user_type')->default('parent'); // 사용자 타입
+            $table->boolean('is_active')->default(true);
             $table->rememberToken();
             $table->timestamps();
         });

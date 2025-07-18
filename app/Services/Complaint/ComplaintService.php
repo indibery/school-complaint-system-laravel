@@ -49,11 +49,26 @@ class ComplaintService implements ComplaintServiceInterface
 
             // 민원 번호 생성
             $data['complaint_number'] = $this->generateComplaintNumber();
-            $data['created_by'] = $user->id;
+            $data['user_id'] = $user->id;
+            $data['status'] = 'submitted';
+            $data['is_public'] = false;
 
-            // 학생 정보 추가 (학부모가 작성하는 경우)
+            // 학생 정보 검증 (학부모가 작성하는 경우)
             if ($user->hasRole('parent') && !empty($data['student_id'])) {
                 $this->validateStudentAccess($user, $data['student_id']);
+            }
+
+            // 학생 ID가 없는 경우 기본 처리
+            if (empty($data['student_id'])) {
+                // 학부모의 경우 첫 번째 자녀를 기본으로 설정
+                if ($user->hasRole('parent')) {
+                    $firstChild = $user->children()->first();
+                    if ($firstChild) {
+                        $data['student_id'] = $firstChild->id;
+                    }
+                }
+                // 그래도 없으면 null로 설정 (데이터베이스에서 nullable)
+                $data['student_id'] = $data['student_id'] ?? null;
             }
 
             // 민원 생성
@@ -69,7 +84,8 @@ class ComplaintService implements ComplaintServiceInterface
             Log::info('민원 생성 완료', [
                 'complaint_id' => $complaint->id,
                 'complaint_number' => $complaint->complaint_number,
-                'user_id' => $user->id
+                'user_id' => $user->id,
+                'student_id' => $data['student_id']
             ]);
 
             return $complaint->load(['category', 'department', 'complainant', 'assignedTo']);
@@ -80,7 +96,8 @@ class ComplaintService implements ComplaintServiceInterface
             Log::error('민원 생성 중 오류 발생', [
                 'user_id' => $user->id,
                 'data' => $data,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             throw $e;
@@ -395,6 +412,10 @@ class ComplaintService implements ComplaintServiceInterface
         }
 
         $childrenIds = $user->children()->pluck('id');
+        if ($childrenIds->isEmpty()) {
+            throw new \Exception('등록된 자녀 정보가 없습니다. 관리자에게 문의하세요.');
+        }
+        
         if (!$childrenIds->contains($studentId)) {
             throw new \Exception('해당 학생에 대한 권한이 없습니다.');
         }

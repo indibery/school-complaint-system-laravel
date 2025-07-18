@@ -1,7 +1,7 @@
-// API 설정
+// 테스트용 고정 API 설정
 export const API_CONFIG = {
-  BASE_URL: 'http://192.168.219.109:8000/api/v1', // 실제 IP 주소로 변경
-  TIMEOUT: 15000, // 타임아웃 15초로 증가
+  BASE_URL: 'http://127.0.0.1:8000/api', // iOS 시뮬레이터용 127.0.0.1
+  TIMEOUT: 15000,
   HEADERS: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -20,7 +20,6 @@ export const APP_CONFIG = {
   },
 };
 
-// 민원 카테고리
 export const COMPLAINT_CATEGORIES = {
   ACADEMIC: {
     id: 'academic',
@@ -56,31 +55,5 @@ export const COMPLAINT_CATEGORIES = {
     description: '즉시 대응이 필요한 긴급 상황',
     icon: 'warning',
     color: '#F44336',
-  },
-};
-
-// 민원 상태
-export const COMPLAINT_STATUS = {
-  PENDING: { id: 'pending', name: '접수', color: '#2196F3' },
-  REVIEWING: { id: 'reviewing', name: '검토중', color: '#FF9800' },
-  PROCESSING: { id: 'processing', name: '처리중', color: '#9C27B0' },
-  HOLD: { id: 'hold', name: '보류', color: '#607D8B' },
-  REJECTED: { id: 'rejected', name: '거절', color: '#F44336' },
-  COMPLETED: { id: 'completed', name: '완료', color: '#4CAF50' },
-};
-
-// 사용자 유형
-export const USER_TYPES = {
-  PARENT: {
-    id: 'parent',
-    name: '학부모',
-    description: '자녀 관련 민원을 등록할 수 있습니다',
-    icon: 'family-restroom',
-  },
-  GUARD: {
-    id: 'guard',
-    name: '학교지킴이',
-    description: '시설 및 안전 관련 민원을 등록할 수 있습니다',
-    icon: 'security',
   },
 };

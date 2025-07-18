@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학교민원시스템 API 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left: 4px solid #f44336;
+        }
+        .status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .status.error {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏫 학교민원시스템 API 테스트</h1>
+    
+    <div class="container">
+        <h2>🔧 API 연결 테스트</h2>
+        <button class="test-button" onclick="testAPI()">기본 API 상태 확인</button>
+        <button class="test-button" onclick="testCategories()">공개 카테고리 조회</button>
+        <button class="test-button" onclick="testDatabase()">데이터베이스 연결</button>
+        <button class="test-button" onclick="testLogin()">간단한 로그인</button>
+        <button class="test-button" onclick="testComplaintRegistration()">민원 등록 테스트 (CSRF 없음)</button>
+        <button class="test-button" onclick="testComplaintList()">공개 민원 목록</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>📱 Expo 앱 연결 테스트</h2>
+        <p>위의 API 테스트가 모두 성공하면 Expo 앱에서 다음 코드를 사용할 수 있습니다:</p>
+        <div class="result">
+// 기본 API 상태 확인
+fetch('http://172.16.29.142:8000/api/', {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+})
+.then(response => response.json())
+.then(data => console.log('API 상태:', data))
+.catch(error => console.error('에러:', error));
+
+// 공개 카테고리 조회
+fetch('http://172.16.29.142:8000/api/v1/categories/public', {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+})
+.then(response => response.json())
+.then(data => console.log('카테고리:', data))
+.catch(error => console.error('에러:', error));
+
+// 간단한 로그인
+fetch('http://172.16.29.142:8000/api/debug/simple-login', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+        email: 'parent@test.com',
+        password: 'password123'
+    })
+})
+.then(response => response.json())
+.then(data => console.log('로그인 결과:', data))
+.catch(error => console.error('에러:', error));
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://172.16.29.142:8000/api';
+        
+        function showResult(data, isSuccess = true) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <div class="status ${isSuccess ? 'success' : 'error'}">
+                    ${isSuccess ? '✅ 성공' : '❌ 실패'}
+                </div>
+                <br><br>
+                ${JSON.stringify(data, null, 2)}
+            `;
+        }
+        
+        async function testAPI() {
+            try {
+                const response = await fetch(`${BASE_URL}/`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+        
+        async function testCategories() {
+            try {
+                const response = await fetch(`${BASE_URL}/v1/categories/public`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+        
+        async function testDatabase() {
+            try {
+                const response = await fetch(`${BASE_URL}/debug/check-db`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                const response = await fetch(`${BASE_URL}/debug/simple-login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'parent@test.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+        
+        async function testComplaintRegistration() {
+            try {
+                const response = await fetch(`${BASE_URL}/v1/create-simple-complaint-no-csrf`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: '브라우저 테스트 민원',
+                        content: '브라우저에서 등록한 테스트 민원입니다.',
+                        category_id: 1
+                    })
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+        
+        async function testComplaintList() {
+            try {
+                const response = await fetch(`${BASE_URL}/v1/complaints/public`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                const data = await response.json();
+                showResult(data, response.ok);
+            } catch (error) {
+                showResult({ error: error.message }, false);
+            }
+        }
+    </script>
+</body>
+</html>
